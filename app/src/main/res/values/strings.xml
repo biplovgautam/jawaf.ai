@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">jawafai</string>
+    <string name="app_name">Jawaf.Ai</string>
     <string name="title_activity_login">LoginActivity</string>
     <string name="title_activity_welcome2">welcomeActivity2</string>
     <string name="title_activity_signup2">SignupActivity2</string>
