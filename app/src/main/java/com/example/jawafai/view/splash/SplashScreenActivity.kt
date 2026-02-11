@@ -128,7 +128,13 @@ fun SplashScreen(
         delay(2000) // Wait 2 seconds for animation to show
         hasCheckedInternet = true
         if (!isConnected) {
-            showNoInternetDialog = true
+            delay(5000) // Wait 5 more seconds if not connected
+            if (!isConnected) {
+                 showNoInternetDialog = true
+            } else {
+                 connectionEstablished = true
+                 startFinalCountdown = true
+            }
         } else {
             connectionEstablished = true
             startFinalCountdown = true
@@ -256,48 +262,7 @@ fun SplashScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Connection Status
-            if (hasCheckedInternet) {
-                if (isConnected) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            painter = androidx.compose.ui.res.painterResource(id = android.R.drawable.ic_dialog_info),
-                            contentDescription = "Connected",
-                            tint = JawafAccent,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Connected",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = AppFonts.KaiseiDecolFontFamily,
-                                color = JawafAccent
-                            )
-                        )
-                    }
-                } else {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            painter = androidx.compose.ui.res.painterResource(id = android.R.drawable.ic_dialog_alert),
-                            contentDescription = "No Connection",
-                            tint = Color(0xFFFF5722),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "No Internet Connection",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontFamily = AppFonts.KaiseiDecolFontFamily,
-                                color = Color(0xFFFF5722)
-                            )
-                        )
-                    }
-                }
-            }
+            // Removed Connection Status display as requested
         }
 
         // No Internet Dialog
