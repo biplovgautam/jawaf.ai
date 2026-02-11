@@ -24,6 +24,8 @@ import androidx.navigation.NavController
 import com.example.jawafai.R
 import com.example.jawafai.ui.theme.AppFonts
 import com.example.jawafai.utils.OnboardingPreferences
+import com.example.jawafai.view.ui.theme.JawafAccent
+import com.example.jawafai.view.ui.theme.JawafText
 import kotlinx.coroutines.launch
 import com.airbnb.lottie.compose.*
 
@@ -93,7 +95,7 @@ fun OnboardingScreen(
                         fontSize = 20.sp,
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontFamily = AppFonts.KaiseiDecolFontFamily,
-                            color = Color(0xFF395B64)
+                            color = JawafText
                         )
                     )
                 }
@@ -113,7 +115,7 @@ fun OnboardingScreen(
                 }
             },
             shape = RoundedCornerShape(50),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF395B64)),
+            colors = ButtonDefaults.buttonColors(containerColor = JawafAccent),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 80.dp) // Moved up to make space for indicators
@@ -150,7 +152,7 @@ fun OnboardingScreen(
 
                 // Animate the color based on current page
                 val animatedColor by animateColorAsState(
-                    targetValue = if (index == pagerState.currentPage) Color(0xFF395B64) else Color.Gray,
+                    targetValue = if (index == pagerState.currentPage) JawafAccent else Color.Gray,
                     animationSpec = tween(
                         durationMillis = 300,
                         easing = FastOutSlowInEasing
@@ -207,7 +209,7 @@ fun OnboardingPage1() {
             style = MaterialTheme.typography.headlineMedium.copy(
                 fontFamily = AppFonts.KadwaFontFamily,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF395B64),
+                color = JawafText,
                 fontSize = 28.sp
             )
         )
@@ -221,7 +223,7 @@ fun OnboardingPage1() {
             style = MaterialTheme.typography.bodyMedium.copy(
                 fontFamily = AppFonts.KarlaFontFamily,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF395B64),
+                color = JawafText,
                 fontSize = 16.sp
             )
         )
@@ -263,7 +265,7 @@ fun OnboardingPage2() {
             style = MaterialTheme.typography.headlineMedium.copy(
                 fontFamily = AppFonts.KadwaFontFamily,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF395B64),
+                color = JawafText,
                 fontSize = 28.sp
             )
         )
@@ -277,7 +279,7 @@ fun OnboardingPage2() {
             style = MaterialTheme.typography.bodyMedium.copy(
                 fontFamily = AppFonts.KarlaFontFamily,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF395B64),
+                color = JawafText,
                 fontSize = 16.sp
             )
         )
@@ -319,7 +321,7 @@ fun OnboardingPage3() {
             style = MaterialTheme.typography.headlineMedium.copy(
                 fontFamily = AppFonts.KadwaFontFamily,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF395B64),
+                color = JawafText,
                 fontSize = 28.sp
             )
         )
@@ -333,7 +335,7 @@ fun OnboardingPage3() {
             style = MaterialTheme.typography.bodyMedium.copy(
                 fontFamily = AppFonts.KarlaFontFamily,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF395B64),
+                color = JawafText,
                 fontSize = 16.sp
             )
         )
@@ -375,7 +377,7 @@ fun OnboardingPage4() {
             style = MaterialTheme.typography.headlineMedium.copy(
                 fontFamily = AppFonts.KadwaFontFamily,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF395B64),
+                color = JawafText,
                 fontSize = 28.sp
             )
         )
@@ -389,7 +391,7 @@ fun OnboardingPage4() {
             style = MaterialTheme.typography.bodyMedium.copy(
                 fontFamily = AppFonts.KarlaFontFamily,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF395B64),
+                color = JawafText,
                 fontSize = 16.sp
             )
         )
