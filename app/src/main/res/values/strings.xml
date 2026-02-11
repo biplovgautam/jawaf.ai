@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">jawafai</string>
+    <string name="title_activity_login">LoginActivity</string>
+    <string name="title_activity_welcome2">welcomeActivity2</string>
+    <string name="title_activity_signup2">SignupActivity2</string>
+    <string name="title_activity_registrattion2">RegistrattionActivity2</string>
+    <string name="title_activity_profile2">profileActivity2</string>
+    <string name="title_activity_nevigation">Nevigation</string>
+    <string name="title_activity_homepage">Homepage</string>
+    <string name="title_activity_dummy_chat_screen">DummyChatScreen</string>
+    <string name="title_activity_profile_screen">ProfileScreen</string>
+    <string name="title_activity_settings_screen">SettingsScreen</string>
+    <string name="title_activity_neviagtion2">neviagtion2</string>
+    <string name="title_activity_porfile_screen">PorfileScreen</string>
+    <string name="title_activity_setting_screen">SettingScreen</string>
+    <string name="title_activity_splash_screen">SplashScreenActivity</string>
+    <string name="title_activity_onboard_screen1">OnboardScreen1</string>
+    <string name="title_activity_onborad_screen2">OnboradScreen2</string>
+    <string name="title_activity_onboard_screen3">OnboardScreen3</string>
+    <string name="title_activity_onboard_screen4">OnboardScreen4</string>
+    <string name="title_activity_typography">Typography</string>
+</resources>
