@@ -596,7 +596,8 @@ fun DashboardScreen(
 
                 composable("chatbot") {
                     ChatBotScreen(
-                        onNavigateBack = { navController.popBackStack() }
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToPersona = { navController.navigate("settings/persona") }
                     )
                 }
             }

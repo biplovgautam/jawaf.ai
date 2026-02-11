@@ -35,17 +35,92 @@ import com.airbnb.lottie.compose.*
 import com.example.jawafai.R
 import com.example.jawafai.model.ChatBotMessageModel
 import com.example.jawafai.ui.theme.AppFonts
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatBotScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToPersona: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    // Check persona completion status
+    var isPersonaCompleted by remember { mutableStateOf<Boolean?>(null) }
+    var isCheckingPersona by remember { mutableStateOf(true) }
+
+    // Check if persona is completed when screen loads
+    LaunchedEffect(Unit) {
+        try {
+            val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+            if (currentUserId != null) {
+                val personaRef = FirebaseFirestore.getInstance()
+                    .collection("users")
+                    .document(currentUserId)
+                    .collection("persona")
+
+                val personaData = personaRef.get().await()
+
+                // Check if we have valid answers for the questions
+                val validAnswers = personaData.documents.filter { doc ->
+                    val questionId = doc.id
+                    val answer = doc.getString("answer")
+                    // Check if this question ID exists in our questions and has a valid answer
+                    com.example.jawafai.model.PersonaQuestions.questions.any { it.id == questionId } &&
+                            !answer.isNullOrBlank()
+                }
+
+                // Need at least 8 valid answers to be considered complete
+                isPersonaCompleted = validAnswers.size >= 8
+
+                // If persona is not completed, show toast and redirect
+                if (isPersonaCompleted == false) {
+                    android.widget.Toast.makeText(
+                        context,
+                        "Please complete your persona to start using AI Companion",
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                    // Navigate back and then to persona screen
+                    onNavigateBack()
+                    onNavigateToPersona()
+                }
+            } else {
+                isPersonaCompleted = false
+            }
+        } catch (e: Exception) {
+            Log.e("ChatBotScreen", "Error checking persona: ${e.message}")
+            isPersonaCompleted = false
+        } finally {
+            isCheckingPersona = false
+        }
+    }
+
+    // Show loading while checking persona
+    if (isCheckingPersona || isPersonaCompleted == null) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(
+                color = Color(0xFF395B64)
+            )
+        }
+        return
+    }
+
+    // If persona is not completed, return early (user will be redirected)
+    if (isPersonaCompleted == false) {
+        return
+    }
 
     // State for chatbot functionality - SESSION ONLY (no database persistence)
     var messages by remember { mutableStateOf<List<ChatBotMessageModel>>(emptyList()) }
@@ -130,7 +205,7 @@ fun ChatBotScreen(
                         else -> {
                             val errorDetails = response.error ?: "Unknown error occurred"
                             Log.e("ChatBotScreen", "API Error: $errorDetails")
-                            "I'm having trouble responding right now. Please try again in a moment."
+                            "I'm having trouble responding right now. Please try again in a moment. Error: $errorDetails" // Added error details for debugging
                         }
                     }
 
