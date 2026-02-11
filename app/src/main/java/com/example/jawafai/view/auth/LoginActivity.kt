@@ -180,6 +180,7 @@ fun LoginScreen(viewModel: UserViewModel) {
     // Function to handle login
     val handleLogin = {
         if (email.isNotBlank() && password.isNotBlank()) {
+            isLoading = true // Show loading immediately
             viewModel.login(email, password)
         } else {
             Toast.makeText(context, "Please fill in all fields", Toast.LENGTH_SHORT).show()
@@ -210,10 +211,10 @@ fun LoginScreen(viewModel: UserViewModel) {
                     .padding(horizontal = 32.dp)
                     .imePadding(), // Handle keyboard properly
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 item {
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
 
                 // Lottie Animation
@@ -234,21 +235,8 @@ fun LoginScreen(viewModel: UserViewModel) {
                     )
                 }
 
-                // Subtitle - Using Karla font
                 item {
-                    Text(
-                        text = if (isLoading) "Signing you in..." else "signin to continue using ai powered जवाफ",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontFamily = AppFonts.KarlaFontFamily,
-                            fontSize = 16.sp,
-                            color = if (isLoading) JawafAccent else Color(0xFF666666)
-                        ),
-                        textAlign = TextAlign.Center
-                    )
-                }
-
-                item {
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
                 // Email TextField - Fixed height and validation indicator
@@ -457,15 +445,16 @@ fun LoginScreen(viewModel: UserViewModel) {
                 // Sign In Button - Round cornered
                 item {
                     Button(
-                        onClick = handleLogin,
+                        onClick = { if (!isLoading) handleLogin() },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
                         shape = RoundedCornerShape(28.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = JawafAccent
+                            containerColor = JawafAccent,
+                            disabledContainerColor = JawafAccent // Keep same color when disabled
                         ),
-                        enabled = !isLoading
+                        enabled = true // Always enabled visually, but onClick checks isLoading
                     ) {
                         if (isLoading) {
                             Row(
@@ -474,9 +463,10 @@ fun LoginScreen(viewModel: UserViewModel) {
                             ) {
                                 CircularProgressIndicator(
                                     color = Color.White,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 3.dp
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Text(
                                     text = "Signing In...",
                                     fontFamily = AppFonts.KarlaFontFamily,
