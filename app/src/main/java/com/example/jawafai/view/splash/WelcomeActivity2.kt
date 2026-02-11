@@ -1,6 +1,7 @@
 package com.example.jawafai.view.splash
 
 import android.content.Intent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -10,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -19,6 +21,8 @@ import com.example.jawafai.R
 import com.example.jawafai.ui.theme.AppFonts
 import com.example.jawafai.view.auth.LoginActivity
 import com.example.jawafai.view.auth.RegistrationActivity
+import com.example.jawafai.view.ui.theme.JawafAccent
+import com.example.jawafai.view.ui.theme.JawafText
 import com.airbnb.lottie.compose.*
 
 @Composable
@@ -54,16 +58,11 @@ fun WelcomeScreen() {
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Title: "जवाफ.AI" - Using Kadwa Bold to match splash screen
-            Text(
-                text = "जवाफ.AI",
-                style = MaterialTheme.typography.headlineLarge.copy(
-                    fontFamily = AppFonts.KadwaFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 36.sp,
-                    color = Color(0xFF395B64)
-                ),
-                textAlign = TextAlign.Center
+            // Logo image instead of text
+            Image(
+                painter = painterResource(id = R.drawable.logotext),
+                contentDescription = "Jawaf.AI Logo",
+                modifier = Modifier.width(200.dp)
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -75,7 +74,7 @@ fun WelcomeScreen() {
                     fontFamily = AppFonts.KarlaFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
-                    color = Color(0xFF395B64)
+                    color = JawafText
                 ),
                 textAlign = TextAlign.Center
             )
@@ -98,7 +97,7 @@ fun WelcomeScreen() {
                     }
                 },
                 shape = RoundedCornerShape(25.dp), // More circular edges
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF395B64)),
+                colors = ButtonDefaults.buttonColors(containerColor = JawafAccent),
                 modifier = Modifier
                     .width(200.dp) // Wider but not max width
                     .height(50.dp)
@@ -136,7 +135,7 @@ fun WelcomeScreen() {
                         fontSize = 18.sp,
                         lineHeight = 20.sp, // 100% line height
                         letterSpacing = 0.sp,
-                        color = Color(0xFF395B64)
+                        color = JawafText
                     )
                 )
             }
