@@ -44,6 +44,8 @@ import com.example.jawafai.repository.UserRepositoryImpl
 import com.example.jawafai.ui.theme.JawafaiTheme
 import com.example.jawafai.ui.theme.AppFonts
 import com.example.jawafai.view.dashboard.DashboardActivity
+import com.example.jawafai.view.ui.theme.JawafAccent
+import com.example.jawafai.view.ui.theme.JawafText
 import com.example.jawafai.viewmodel.UserViewModel
 import com.example.jawafai.viewmodel.UserViewModelFactory
 import com.google.firebase.auth.FirebaseAuth
@@ -178,6 +180,7 @@ fun LoginScreen(viewModel: UserViewModel) {
     // Function to handle login
     val handleLogin = {
         if (email.isNotBlank() && password.isNotBlank()) {
+            isLoading = true // Show loading immediately
             viewModel.login(email, password)
         } else {
             Toast.makeText(context, "Please fill in all fields", Toast.LENGTH_SHORT).show()
@@ -208,10 +211,10 @@ fun LoginScreen(viewModel: UserViewModel) {
                     .padding(horizontal = 32.dp)
                     .imePadding(), // Handle keyboard properly
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 item {
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
 
                 // Lottie Animation
@@ -223,35 +226,17 @@ fun LoginScreen(viewModel: UserViewModel) {
                     )
                 }
 
-                // App Title - Using Kadwa font (only exception)
+                // App Logo - Using logotext image
                 item {
-                    Text(
-                        text = "जवाफ.AI",
-                        style = MaterialTheme.typography.headlineLarge.copy(
-                            fontFamily = AppFonts.KadwaFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 36.sp,
-                            color = Color(0xFF395B64)
-                        ),
-                        textAlign = TextAlign.Center
-                    )
-                }
-
-                // Subtitle - Using Karla font
-                item {
-                    Text(
-                        text = if (isLoading) "Signing you in..." else "signin to continue using ai powered जवाफ",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontFamily = AppFonts.KarlaFontFamily,
-                            fontSize = 16.sp,
-                            color = if (isLoading) Color(0xFF395B64) else Color(0xFF666666)
-                        ),
-                        textAlign = TextAlign.Center
+                    Image(
+                        painter = painterResource(id = R.drawable.logotext),
+                        contentDescription = "Jawaf.AI Logo",
+                        modifier = Modifier.width(180.dp)
                     )
                 }
 
                 item {
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
                 // Email TextField - Fixed height and validation indicator
@@ -289,11 +274,11 @@ fun LoginScreen(viewModel: UserViewModel) {
                                 .focusRequester(emailFocusRequester),
                             shape = RoundedCornerShape(28.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color(0xFF395B64),
+                                focusedBorderColor = JawafAccent,
                                 unfocusedBorderColor = Color(0xFFE0E0E0),
-                                focusedLabelColor = Color(0xFF395B64),
+                                focusedLabelColor = JawafAccent,
                                 unfocusedLabelColor = Color(0xFF666666),
-                                cursorColor = Color(0xFF395B64),
+                                cursorColor = JawafAccent,
                                 focusedTextColor = Color.Black,
                                 unfocusedTextColor = Color.Black
                             ),
@@ -303,13 +288,18 @@ fun LoginScreen(viewModel: UserViewModel) {
 
                         // Email validation indicator
                         if (email.isNotBlank()) {
+                            val indicatorColor = when (emailValidationState.value) {
+                                is UserViewModel.EmailValidationState.Valid -> JawafAccent
+                                is UserViewModel.EmailValidationState.Invalid -> Color(0xFFE57373) // Red for invalid
+                                else -> Color(0xFFA5C9CA) // Default/checking color
+                            }
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.CenterEnd)
                                     .padding(end = 16.dp)
                                     .size(24.dp)
                                     .background(
-                                        Color(0xFFA5C9CA),
+                                        indicatorColor,
                                         CircleShape
                                     ),
                                 contentAlignment = Alignment.Center
@@ -387,7 +377,7 @@ fun LoginScreen(viewModel: UserViewModel) {
                                 Icon(
                                     imageVector = image,
                                     contentDescription = description,
-                                    tint = Color(0xFF395B64)
+                                    tint = JawafAccent
                                 )
                             }
                         },
@@ -397,11 +387,11 @@ fun LoginScreen(viewModel: UserViewModel) {
                             .focusRequester(passwordFocusRequester),
                         shape = RoundedCornerShape(28.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF395B64),
+                            focusedBorderColor = JawafAccent,
                             unfocusedBorderColor = Color(0xFFE0E0E0),
-                            focusedLabelColor = Color(0xFF395B64),
+                            focusedLabelColor = JawafAccent,
                             unfocusedLabelColor = Color(0xFF666666),
-                            cursorColor = Color(0xFF395B64),
+                            cursorColor = JawafAccent,
                             focusedTextColor = Color.Black,
                             unfocusedTextColor = Color.Black
                         ),
@@ -424,7 +414,7 @@ fun LoginScreen(viewModel: UserViewModel) {
                                 checked = rememberMe,
                                 onCheckedChange = { if (!isLoading) rememberMe = it },
                                 colors = CheckboxDefaults.colors(
-                                    checkedColor = Color(0xFF395B64),
+                                    checkedColor = JawafAccent,
                                     uncheckedColor = Color(0xFF666666)
                                 ),
                                 enabled = !isLoading
@@ -442,7 +432,7 @@ fun LoginScreen(viewModel: UserViewModel) {
                             text = "Forgot Password?",
                             fontFamily = AppFonts.KarlaFontFamily,
                             fontSize = 14.sp,
-                            color = Color(0xFF395B64),
+                            color = JawafAccent,
                             modifier = Modifier.clickable(enabled = !isLoading) {
                                 if (!isLoading) {
                                     showResetDialog = true
@@ -455,15 +445,16 @@ fun LoginScreen(viewModel: UserViewModel) {
                 // Sign In Button - Round cornered
                 item {
                     Button(
-                        onClick = handleLogin,
+                        onClick = { if (!isLoading) handleLogin() },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
                         shape = RoundedCornerShape(28.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF395B64)
+                            containerColor = JawafAccent,
+                            disabledContainerColor = JawafAccent // Keep same color when disabled
                         ),
-                        enabled = !isLoading
+                        enabled = true // Always enabled visually, but onClick checks isLoading
                     ) {
                         if (isLoading) {
                             Row(
@@ -472,9 +463,10 @@ fun LoginScreen(viewModel: UserViewModel) {
                             ) {
                                 CircularProgressIndicator(
                                     color = Color.White,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 3.dp
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Text(
                                     text = "Signing In...",
                                     fontFamily = AppFonts.KarlaFontFamily,
@@ -516,7 +508,7 @@ fun LoginScreen(viewModel: UserViewModel) {
                             fontFamily = AppFonts.KarlaFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp,
-                            color = Color(0xFF395B64),
+                            color = JawafAccent,
                             modifier = Modifier.clickable(enabled = !isLoading) {
                                 if (!isLoading) {
                                     // Navigate to registration screen
@@ -592,7 +584,7 @@ fun LoginScreen(viewModel: UserViewModel) {
                     Text(
                         "Send Reset Link",
                         fontFamily = AppFonts.KarlaFontFamily,
-                        color = Color(0xFF395B64)
+                        color = JawafAccent
                     )
                 }
             },

@@ -7,6 +7,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -43,6 +44,8 @@ import com.example.jawafai.model.UserModel
 import com.example.jawafai.repository.UserRepositoryImpl
 import com.example.jawafai.ui.theme.JawafaiTheme
 import com.example.jawafai.ui.theme.AppFonts
+import com.example.jawafai.view.ui.theme.JawafAccent
+import com.example.jawafai.view.ui.theme.JawafText
 import com.example.jawafai.viewmodel.UserViewModel
 import com.example.jawafai.viewmodel.UserViewModelFactory
 import com.google.firebase.auth.FirebaseAuth
@@ -304,17 +307,12 @@ fun RegistrationScreen(
                     )
                 }
 
-                // App Title - Using Kadwa font
+                // App Logo - Using logotext image
                 item {
-                    Text(
-                        text = "जवाफ.AI",
-                        style = MaterialTheme.typography.headlineLarge.copy(
-                            fontFamily = AppFonts.KadwaFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 28.sp, // Slightly smaller for registration
-                            color = Color(0xFF395B64)
-                        ),
-                        textAlign = TextAlign.Center
+                    Image(
+                        painter = painterResource(id = R.drawable.logotext),
+                        contentDescription = "Jawaf.AI Logo",
+                        modifier = Modifier.width(150.dp)
                     )
                 }
 
@@ -325,7 +323,7 @@ fun RegistrationScreen(
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontFamily = AppFonts.KarlaFontFamily,
                             fontSize = 16.sp,
-                            color = if (isLoading) Color(0xFF395B64) else Color(0xFF666666)
+                            color = if (isLoading) JawafAccent else Color(0xFF666666)
                         ),
                         textAlign = TextAlign.Center
                     )
@@ -364,11 +362,11 @@ fun RegistrationScreen(
                             .height(64.dp),
                         shape = RoundedCornerShape(28.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF395B64),
+                            focusedBorderColor = JawafAccent,
                             unfocusedBorderColor = Color(0xFFE0E0E0),
-                            focusedLabelColor = Color(0xFF395B64),
+                            focusedLabelColor = JawafAccent,
                             unfocusedLabelColor = Color(0xFF666666),
-                            cursorColor = Color(0xFF395B64),
+                            cursorColor = JawafAccent,
                             focusedTextColor = Color.Black,
                             unfocusedTextColor = Color.Black
                         ),
@@ -407,11 +405,11 @@ fun RegistrationScreen(
                             .focusRequester(lastNameFocusRequester),
                         shape = RoundedCornerShape(28.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF395B64),
+                            focusedBorderColor = JawafAccent,
                             unfocusedBorderColor = Color(0xFFE0E0E0),
-                            focusedLabelColor = Color(0xFF395B64),
+                            focusedLabelColor = JawafAccent,
                             unfocusedLabelColor = Color(0xFF666666),
-                            cursorColor = Color(0xFF395B64),
+                            cursorColor = JawafAccent,
                             focusedTextColor = Color.Black,
                             unfocusedTextColor = Color.Black
                         ),
@@ -453,11 +451,11 @@ fun RegistrationScreen(
                             .focusRequester(usernameFocusRequester),
                         shape = RoundedCornerShape(28.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = if (isUsernameValid) Color(0xFF395B64) else MaterialTheme.colorScheme.error,
+                            focusedBorderColor = if (isUsernameValid) JawafAccent else MaterialTheme.colorScheme.error,
                             unfocusedBorderColor = if (isUsernameValid) Color(0xFFE0E0E0) else MaterialTheme.colorScheme.error,
-                            focusedLabelColor = Color(0xFF395B64),
+                            focusedLabelColor = JawafAccent,
                             unfocusedLabelColor = Color(0xFF666666),
-                            cursorColor = Color(0xFF395B64),
+                            cursorColor = JawafAccent,
                             focusedTextColor = Color.Black,
                             unfocusedTextColor = Color.Black
                         ),
@@ -500,11 +498,11 @@ fun RegistrationScreen(
                             .focusRequester(emailFocusRequester),
                         shape = RoundedCornerShape(28.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = if (isEmailValid) Color(0xFF395B64) else MaterialTheme.colorScheme.error,
+                            focusedBorderColor = if (isEmailValid) JawafAccent else MaterialTheme.colorScheme.error,
                             unfocusedBorderColor = if (isEmailValid) Color(0xFFE0E0E0) else MaterialTheme.colorScheme.error,
-                            focusedLabelColor = Color(0xFF395B64),
+                            focusedLabelColor = JawafAccent,
                             unfocusedLabelColor = Color(0xFF666666),
-                            cursorColor = Color(0xFF395B64),
+                            cursorColor = JawafAccent,
                             focusedTextColor = Color.Black,
                             unfocusedTextColor = Color.Black
                         ),
@@ -552,7 +550,7 @@ fun RegistrationScreen(
                                 Icon(
                                     imageVector = image,
                                     contentDescription = description,
-                                    tint = Color(0xFF395B64)
+                                    tint = JawafAccent
                                 )
                             }
                         },
@@ -562,11 +560,11 @@ fun RegistrationScreen(
                             .focusRequester(passwordFocusRequester),
                         shape = RoundedCornerShape(28.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF395B64),
+                            focusedBorderColor = JawafAccent,
                             unfocusedBorderColor = Color(0xFFE0E0E0),
-                            focusedLabelColor = Color(0xFF395B64),
+                            focusedLabelColor = JawafAccent,
                             unfocusedLabelColor = Color(0xFF666666),
-                            cursorColor = Color(0xFF395B64),
+                            cursorColor = JawafAccent,
                             focusedTextColor = Color.Black,
                             unfocusedTextColor = Color.Black
                         ),
@@ -603,7 +601,7 @@ fun RegistrationScreen(
                             Icon(
                                 painter = painterResource(id = android.R.drawable.ic_menu_my_calendar),
                                 contentDescription = "Select date",
-                                tint = Color(0xFF395B64),
+                                tint = JawafAccent,
                                 modifier = Modifier.clickable(enabled = !isLoading) {
                                     if (!isLoading) showDatePicker = true
                                 }
@@ -618,11 +616,11 @@ fun RegistrationScreen(
                             },
                         shape = RoundedCornerShape(28.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF395B64),
+                            focusedBorderColor = JawafAccent,
                             unfocusedBorderColor = Color(0xFFE0E0E0),
-                            focusedLabelColor = Color(0xFF395B64),
+                            focusedLabelColor = JawafAccent,
                             unfocusedLabelColor = Color(0xFF666666),
-                            cursorColor = Color(0xFF395B64),
+                            cursorColor = JawafAccent,
                             focusedTextColor = Color.Black,
                             unfocusedTextColor = Color.Black
                         ),
@@ -645,7 +643,7 @@ fun RegistrationScreen(
                                 }
                             },
                             colors = CheckboxDefaults.colors(
-                                checkedColor = Color(0xFF395B64),
+                                checkedColor = JawafAccent,
                                 uncheckedColor = if (showTermsError) MaterialTheme.colorScheme.error else Color(0xFF666666)
                             ),
                             enabled = !isLoading
@@ -668,7 +666,7 @@ fun RegistrationScreen(
                             .height(56.dp),
                         shape = RoundedCornerShape(28.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF395B64)
+                            containerColor = JawafAccent
                         ),
                         enabled = !isLoading
                     ) {
@@ -723,7 +721,7 @@ fun RegistrationScreen(
                             fontFamily = AppFonts.KarlaFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp,
-                            color = Color(0xFF395B64),
+                            color = JawafAccent,
                             modifier = Modifier.clickable(enabled = !isLoading) {
                                 if (!isLoading) {
                                     onNavigateToLogin()
