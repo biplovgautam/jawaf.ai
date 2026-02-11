@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -20,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -42,12 +44,45 @@ fun SplashScreen(
 ) {
     val context = LocalContext.current
 
-    // Lottie animation composition
-    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.live_chatbot))
-    val progress by animateLottieCompositionAsState(
-        composition,
-        iterations = LottieConstants.IterateForever
+    // Animation states for the logo
+    var startLogoAnimation by remember { mutableStateOf(false) }
+
+    // Fade in animation for the logo
+    val logoAlpha by animateFloatAsState(
+        targetValue = if (startLogoAnimation) 1f else 0f,
+        animationSpec = tween(
+            durationMillis = 1000,
+            easing = FastOutSlowInEasing
+        ),
+        label = "Logo Fade"
     )
+
+    // Pulse animation (infinite scale)
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val logoScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "Logo Scale"
+    )
+
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "Pulse Alpha"
+    )
+
+    // Start fade animation as soon as composition enters
+    LaunchedEffect(Unit) {
+        startLogoAnimation = true
+    }
 
     // Network connectivity state
     val isConnected = rememberNetworkConnectivity()
@@ -191,26 +226,17 @@ fun SplashScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Lottie Animation
-            LottieAnimation(
-                composition = composition,
-                progress = { progress },
-                modifier = Modifier.size(250.dp)
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // App Name - Using Kadwa Bold font as per Figma specifications
-            Text(
-                text = "जवाफ.AI",
-                style = MaterialTheme.typography.headlineLarge.copy(
-                    fontFamily = AppFonts.KadwaFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 32.sp,
-                    lineHeight = 32.sp,
-                    letterSpacing = 0.sp,
-                    color = JawafText
-                )
+            // Replaced Lottie Animation with Image (Fade + Pulse)
+            Image(
+                painter = painterResource(id = R.drawable.logotext),
+                contentDescription = "Jawaf.AI Logo",
+                modifier = Modifier
+                    .width(300.dp) // Adjust width as needed based on the aspect ratio of logotext.png
+                    .graphicsLayer(
+                        alpha = logoAlpha * pulseAlpha,
+                        scaleX = if (startLogoAnimation) logoScale else 0.8f,
+                        scaleY = if (startLogoAnimation) logoScale else 0.8f
+                    )
             )
 
             Spacer(modifier = Modifier.height(16.dp))
