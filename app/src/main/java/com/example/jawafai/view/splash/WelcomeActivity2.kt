@@ -26,7 +26,7 @@ fun WelcomeScreen() {
     val context = LocalContext.current
 
     // Lottie animation composition - same as splash screen
-    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.live_chatbot))
+    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.welcomenimation))
     val progress by animateLottieCompositionAsState(
         composition,
         iterations = LottieConstants.IterateForever
