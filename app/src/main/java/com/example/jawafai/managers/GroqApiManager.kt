@@ -1,6 +1,7 @@
 package com.example.jawafai.managers
 
 import android.util.Log
+import com.example.jawafai.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -21,9 +22,9 @@ object GroqApiManager {
 
     // Groq API Configuration
     private const val GROQ_BASE_URL = "https://api.groq.com/openai/v1/chat/completions"
-    private val GROQ_API_KEY = com.example.jawafai.BuildConfig.GROQ_API_KEY
+    private val GROQ_API_KEY = BuildConfig.GROQ_API_KEY // Loaded from local.properties or BuildConfig
     // Model Configuration
-    private const val DEFAULT_MODEL = "llama3-8b-8192" // Changed to a valid model
+    private const val DEFAULT_MODEL = "llama-3.3-70b-versatile" // Latest powerful Groq model
     private const val MAX_TOKENS = 2048
     private const val TEMPERATURE = 0.7f
     private const val MAX_CONVERSATION_HISTORY = 10 // Keep last 10 messages for context
@@ -417,10 +418,10 @@ object GroqApiManager {
      */
     fun getAvailableModels(): List<String> {
         return listOf(
+            "llama-3.3-70b-versatile", // Latest and most powerful
+            "llama-3.1-70b-versatile",
+            "llama-3.1-8b-instant",
             "mixtral-8x7b-32768",
-            "llama3-70b-8192",
-            "llama3-8b-8192",
-            "gemma-7b-it",
             "gemma2-9b-it"
         )
     }
