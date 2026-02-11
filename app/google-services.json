@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "568065948875",
+    "project_id": "jawafai-d2c23",
+    "storage_bucket": "jawafai-d2c23.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:568065948875:android:61d1c9586acf9c62f6ef4e",
+        "android_client_info": {
+          "package_name": "com.example.jawafai"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "568065948875-kv14gu1jc2d19ltldh2rvc2oj4huq7f0.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPactLxHoaNG-t7YrMSYEzxEIj726X3ew"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "568065948875-kv14gu1jc2d19ltldh2rvc2oj4huq7f0.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
