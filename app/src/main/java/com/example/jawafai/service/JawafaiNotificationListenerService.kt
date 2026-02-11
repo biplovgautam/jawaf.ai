@@ -143,12 +143,24 @@ class JawafaiNotificationListenerService : NotificationListenerService() {
         // Generate hash for deduplication
         val hash = NotificationMemoryStore.generateHash(title, text, packageName)
 
+        // Capture ALL raw extras for debugging/analysis
+        val rawExtras = mutableMapOf<String, String>()
+        extras.keySet()?.forEach { key ->
+            val value = extras.get(key)
+            rawExtras[key] = when (value) {
+                is CharSequence -> value.toString()
+                is Array<*> -> value.joinToString(", ") { it.toString() }
+                else -> value.toString()
+            }
+        }
+
         Log.d(TAG, "Extracted notification data:")
         Log.d(TAG, "  Title: $title")
         Log.d(TAG, "  Text: $text")
         Log.d(TAG, "  Sender: $sender")
         Log.d(TAG, "  ConversationId: $conversationId")
         Log.d(TAG, "  HasReplyAction: $hasReplyAction")
+        Log.d(TAG, "  Raw Extras Count: ${rawExtras.size}")
 
         return NotificationMemoryStore.ExternalNotification(
             title = title,
@@ -161,7 +173,8 @@ class JawafaiNotificationListenerService : NotificationListenerService() {
             hasReplyAction = hasReplyAction,
             replyAction = replyAction,
             remoteInput = remoteInput,
-            hash = hash
+            hash = hash,
+            rawExtras = rawExtras
         )
     }
 

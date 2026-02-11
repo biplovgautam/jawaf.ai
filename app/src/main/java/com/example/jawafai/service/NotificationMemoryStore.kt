@@ -21,7 +21,8 @@ object NotificationMemoryStore {
         val remoteInput: RemoteInput? = null, // RemoteInput reference
         val hash: String,                     // For deduplication
         val ai_reply: String = "",            // AI generated reply (empty if not generated)
-        val is_sent: Boolean = false          // Whether reply was sent via RemoteInput
+        val is_sent: Boolean = false,         // Whether reply was sent via RemoteInput
+        val rawExtras: Map<String, String> = emptyMap() // ALL raw notification extras for debugging
     )
 
     private val notifications: SnapshotStateList<ExternalNotification> = mutableStateListOf()

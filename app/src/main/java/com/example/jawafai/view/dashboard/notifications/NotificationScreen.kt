@@ -1,6 +1,8 @@
 package com.example.jawafai.view.dashboard.notifications
 
 import android.content.BroadcastReceiver
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -23,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -93,6 +96,7 @@ fun NotificationScreen(
     var isRefreshing by remember { mutableStateOf(false) }
     var selectedFilter by remember { mutableStateOf<ChatPlatform?>(null) }
     var generatingReplyFor by remember { mutableStateOf<String?>(null) }
+    var selectedTab by remember { mutableStateOf(0) } // 0 = Smart, 1 = Raw
 
     // Send status tracking
     var sendingStatus by remember { mutableStateOf<Map<String, RemoteReplyService.ReplyStatus>>(emptyMap()) }
@@ -360,6 +364,91 @@ fun NotificationScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
+            // Tab Row for Smart vs Raw
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = Color.White,
+                contentColor = Color(0xFF395B64),
+                indicator = { tabPositions ->
+                    TabRowDefaults.Indicator(
+                        Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                        color = Color(0xFF395B64)
+                    )
+                }
+            ) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = {
+                        Text(
+                            text = "Smart",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontFamily = AppFonts.KarlaFontFamily,
+                                fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal
+                            )
+                        )
+                    }
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = {
+                        Text(
+                            text = "Raw",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontFamily = AppFonts.KarlaFontFamily,
+                                fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal
+                            )
+                        )
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Conditional rendering based on selected tab
+            when (selectedTab) {
+                0 -> {
+                    // Smart Tab (existing functionality)
+                    SmartNotificationsContent(
+                        selectedFilter = selectedFilter,
+                        onFilterChange = { selectedFilter = it },
+                        isRefreshing = isRefreshing,
+                        filteredNotifications = filteredNotifications,
+                        generatingReplyFor = generatingReplyFor,
+                        sendingStatus = sendingStatus,
+                        sendingMessages = sendingMessages,
+                        onGenerateReply = { notificationHash -> generateAIReply(notificationHash) },
+                        onSendReply = { conversationId, replyText -> sendReply(conversationId, replyText) }
+                    )
+                }
+                1 -> {
+                    // Raw Tab (new functionality)
+                    RawNotificationsContent(
+                        notifications = externalNotifications
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SmartNotificationsContent(
+    selectedFilter: ChatPlatform?,
+    onFilterChange: (ChatPlatform?) -> Unit,
+    isRefreshing: Boolean,
+    filteredNotifications: List<ChatNotification>,
+    generatingReplyFor: String?,
+    sendingStatus: Map<String, RemoteReplyService.ReplyStatus>,
+    sendingMessages: Map<String, String>,
+    onGenerateReply: (String) -> Unit,
+    onSendReply: (String, String) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+
             // Platform Filter Chips
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -367,7 +456,7 @@ fun NotificationScreen(
             ) {
                 item {
                     FilterChip(
-                        onClick = { selectedFilter = null },
+                        onClick = { onFilterChange(null) },
                         label = { Text("All") },
                         selected = selectedFilter == null,
                         colors = FilterChipDefaults.filterChipColors(
@@ -380,7 +469,7 @@ fun NotificationScreen(
                 items(ChatPlatform.values().toList()) { platform ->
                     FilterChip(
                         onClick = {
-                            selectedFilter = if (selectedFilter == platform) null else platform
+                            onFilterChange(if (selectedFilter == platform) null else platform)
                         },
                         label = { Text(platform.displayName) },
                         selected = selectedFilter == platform,
@@ -446,8 +535,8 @@ fun NotificationScreen(
                     items(filteredNotifications) { notification ->
                         EnhancedNotificationCard(
                             notification = notification,
-                            onGenerateReply = { generateAIReply(notification.notificationHash) },
-                            onSendReply = { sendReply(notification.conversationId, notification.generatedReply) },
+                            onGenerateReply = { onGenerateReply(notification.notificationHash) },
+                            onSendReply = { onSendReply(notification.conversationId, notification.generatedReply) },
                             onMarkAsRead = { /* Handle mark as read */ },
                             isGeneratingReply = generatingReplyFor == notification.notificationHash,
                             sendingStatus = sendingStatus[notification.conversationId],
@@ -460,7 +549,6 @@ fun NotificationScreen(
                     }
                 }
             }
-        }
     }
 }
 
@@ -1000,6 +1088,299 @@ fun formatTimestamp(timestamp: Long): String {
         diff < 48 * 60 * 60 * 1000 -> "yesterday"
         else -> {
             SimpleDateFormat("MMM dd", Locale.getDefault()).format(Date(timestamp))
+        }
+    }
+}
+
+@Composable
+fun RawNotificationsContent(
+    notifications: List<NotificationMemoryStore.ExternalNotification>
+) {
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        if (notifications.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Code,
+                        contentDescription = "No raw data",
+                        modifier = Modifier.size(48.dp),
+                        tint = Color(0xFF666666).copy(alpha = 0.5f)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "No raw notification data",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = AppFonts.KaiseiDecolFontFamily,
+                            fontSize = 16.sp,
+                            color = Color(0xFF666666)
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Notifications will appear here in raw format",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = AppFonts.KaiseiDecolFontFamily,
+                            fontSize = 14.sp,
+                            color = Color(0xFF999999)
+                        ),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(vertical = 8.dp)
+            ) {
+                items(notifications) { notification ->
+                    RawNotificationCard(notification = notification)
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun RawNotificationCard(
+    notification: NotificationMemoryStore.ExternalNotification
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { isExpanded = !isExpanded },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFF5F5F5)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            // Header with expand/collapse icon
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Code,
+                        contentDescription = "Raw Data",
+                        modifier = Modifier.size(16.dp),
+                        tint = Color(0xFF1BC994)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = notification.packageName.split(".").lastOrNull() ?: notification.packageName,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = AppFonts.KarlaFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = Color(0xFF1BC994)
+                        )
+                    )
+                }
+
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    tint = Color(0xFF666666)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Always visible: Hash (for identification)
+            RawDataField(label = "Hash", value = notification.hash.take(16) + "...")
+
+            // Expandable content
+            if (isExpanded) {
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Show processed fields first
+                Text(
+                    text = "Processed Fields:",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = AppFonts.KarlaFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = Color(0xFF1BC994)
+                    )
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                RawDataField(label = "Title", value = notification.title)
+                RawDataField(label = "Text", value = notification.text)
+                RawDataField(label = "Package Name", value = notification.packageName)
+                RawDataField(label = "Timestamp", value = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(notification.time)))
+                RawDataField(label = "Sender", value = notification.sender ?: "(null)")
+                RawDataField(label = "Conversation Title", value = notification.conversationTitle ?: "(null)")
+                RawDataField(label = "Conversation ID", value = notification.conversationId)
+                RawDataField(label = "Has Reply Action", value = notification.hasReplyAction.toString())
+                RawDataField(label = "AI Reply", value = notification.ai_reply.ifBlank { "(empty)" })
+                RawDataField(label = "Is Sent", value = notification.is_sent.toString())
+                RawDataField(label = "Full Hash", value = notification.hash)
+
+                // Show ALL raw extras
+                if (notification.rawExtras.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "Raw Notification Extras (${notification.rawExtras.size} fields):",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = AppFonts.KarlaFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = Color(0xFFFF6B00)
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    notification.rawExtras.forEach { (key, value) ->
+                        RawDataField(label = key, value = value)
+                    }
+                }
+
+                // JSON-like representation
+                Spacer(modifier = Modifier.height(12.dp))
+
+                val context = LocalContext.current
+                val jsonString = remember(notification) {
+                    buildString {
+                        appendLine("{")
+                        appendLine("  \"title\": \"${notification.title}\",")
+                        appendLine("  \"text\": \"${notification.text}\",")
+                        appendLine("  \"packageName\": \"${notification.packageName}\",")
+                        appendLine("  \"time\": ${notification.time},")
+                        appendLine("  \"sender\": ${if (notification.sender != null) "\"${notification.sender}\"" else "null"},")
+                        appendLine("  \"conversationTitle\": ${if (notification.conversationTitle != null) "\"${notification.conversationTitle}\"" else "null"},")
+                        appendLine("  \"conversationId\": \"${notification.conversationId}\",")
+                        appendLine("  \"hasReplyAction\": ${notification.hasReplyAction},")
+                        appendLine("  \"ai_reply\": \"${notification.ai_reply}\",")
+                        appendLine("  \"is_sent\": ${notification.is_sent},")
+                        appendLine("  \"hash\": \"${notification.hash}\",")
+                        appendLine("  \"rawExtras\": {")
+                        notification.rawExtras.entries.forEachIndexed { index, (key, value) ->
+                            val isLast = index == notification.rawExtras.size - 1
+                            val escapedValue = value.replace("\"", "\\\"").replace("\n", "\\n")
+                            appendLine("    \"$key\": \"$escapedValue\"${if (!isLast) "," else ""}")
+                        }
+                        appendLine("  }")
+                        append("}")
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Complete JSON Structure:",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = AppFonts.KarlaFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = Color(0xFF00FF00)
+                        )
+                    )
+
+                    IconButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clip = ClipData.newPlainText("Notification JSON", jsonString)
+                            clipboard.setPrimaryClip(clip)
+                            Toast.makeText(context, "JSON copied to clipboard!", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "Copy JSON",
+                            tint = Color(0xFF00FF00),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFF2D2D2D)
+                ) {
+                    Text(
+                        text = jsonString,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            color = Color(0xFF00FF00),
+                            lineHeight = 16.sp
+                        ),
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun RawDataField(
+    label: String,
+    value: String
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = AppFonts.KarlaFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp,
+                color = Color(0xFF666666)
+            )
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(4.dp),
+            color = Color.White
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    fontSize = 12.sp,
+                    color = Color(0xFF191919)
+                ),
+                modifier = Modifier.padding(8.dp)
+            )
         }
     }
 }
