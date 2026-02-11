@@ -30,6 +30,8 @@ import com.example.jawafai.R
 import com.example.jawafai.ui.theme.AppFonts
 import com.example.jawafai.utils.rememberNetworkConnectivity
 import com.example.jawafai.utils.NotificationPermissionUtils
+import com.example.jawafai.view.ui.theme.JawafAccent
+import com.example.jawafai.view.ui.theme.JawafText
 import kotlinx.coroutines.delay
 import com.airbnb.lottie.compose.*
 
@@ -207,7 +209,7 @@ fun SplashScreen(
                     fontSize = 32.sp,
                     lineHeight = 32.sp,
                     letterSpacing = 0.sp,
-                    color = Color(0xFF395B64)
+                    color = JawafText
                 )
             )
 
@@ -222,7 +224,7 @@ fun SplashScreen(
                     fontSize = 15.sp,
                     lineHeight = 15.sp,
                     letterSpacing = 0.sp,
-                    color = Color(0xFF395B64)
+                    color = JawafText
                 )
             )
 
@@ -237,7 +239,7 @@ fun SplashScreen(
                         Icon(
                             painter = androidx.compose.ui.res.painterResource(id = android.R.drawable.ic_dialog_info),
                             contentDescription = "Connected",
-                            tint = Color(0xFF4CAF50),
+                            tint = JawafAccent,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -245,7 +247,7 @@ fun SplashScreen(
                             text = "Connected",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = AppFonts.KaiseiDecolFontFamily,
-                                color = Color(0xFF4CAF50)
+                                color = JawafAccent
                             )
                         )
                     }
@@ -282,7 +284,7 @@ fun SplashScreen(
                         text = "No Internet Connection",
                         style = MaterialTheme.typography.headlineSmall.copy(
                             fontFamily = AppFonts.KaiseiDecolFontFamily,
-                            color = Color(0xFF395B64)
+                            color = JawafText
                         )
                     )
                 },
@@ -304,7 +306,7 @@ fun SplashScreen(
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF395B64)
+                            containerColor = JawafAccent
                         ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -358,7 +360,7 @@ fun SplashScreen(
                         text = "Notification Access Required",
                         style = MaterialTheme.typography.headlineSmall.copy(
                             fontFamily = AppFonts.KaiseiDecolFontFamily,
-                            color = Color(0xFF395B64)
+                            color = JawafText
                         )
                     )
                 },
@@ -378,7 +380,7 @@ fun SplashScreen(
                             NotificationPermissionUtils.openNotificationAccessSettings(context)
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF395B64)
+                            containerColor = JawafAccent
                         ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
