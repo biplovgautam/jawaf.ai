@@ -177,7 +177,7 @@ object ReminderIntentDetector {
     }
 
     /**
-     * Use LLM to extract reminder details
+     * Use LLM to extract reminder details with intelligent title and description generation
      */
     private suspend fun extractReminderWithLLM(
         text: String,
@@ -189,13 +189,29 @@ object ReminderIntentDetector {
             val currentDateStr = currentDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
 
             val systemPrompt = """
-You are a reminder extraction assistant. Current date/time: $currentDateStr
+You are a smart reminder extraction assistant. Current date/time: $currentDateStr
 
-Analyze the text and extract event/reminder details. 
-Respond ONLY with JSON (no markdown):
-{"found": true/false, "title": "event title", "description": "brief description", "date": "YYYY-MM-DD", "time": "HH:mm", "event_type": "MEETING/WORK/PERSONAL/HEALTH/SPORTS/SOCIAL/REMINDER/OTHER", "confidence": 0.0-1.0}
+Analyze the conversation/message and extract event/reminder details.
 
-If no clear event, return: {"found": false}
+IMPORTANT RULES:
+1. Generate a CONCISE, MEANINGFUL title (2-5 words) that captures the event essence
+   - Good: "Futsal with Friends", "Team Meeting", "Doctor Appointment"
+   - Bad: "Event", "Meeting", "Thing to do"
+   
+2. Generate a HELPFUL description that includes:
+   - Who is involved (if mentioned)
+   - Location (if mentioned)
+   - Any important context
+   
+3. Accurately parse the date/time relative to current date: $currentDateStr
+   - "tomorrow" = next day
+   - "tonight" = today evening
+   - Day names = next occurrence of that day
+
+Respond ONLY with JSON (no markdown, no code blocks):
+{"found": true, "title": "concise event title", "description": "helpful description with context", "date": "YYYY-MM-DD", "time": "HH:mm", "event_type": "MEETING/WORK/PERSONAL/HEALTH/SPORTS/SOCIAL/REMINDER/OTHER", "confidence": 0.0-1.0}
+
+If no clear event/time found, return: {"found": false}
             """.trimIndent()
 
             val messages = listOf(

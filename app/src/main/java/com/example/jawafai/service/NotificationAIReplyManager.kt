@@ -549,7 +549,7 @@ object NotificationAIReplyManager {
     }
 
     /**
-     * Format schedule into a readable summary for AI context
+     * Format schedule into a readable summary for AI context with alternative suggestions
      */
     fun formatScheduleSummary(reminders: List<Reminder>, date: LocalDate): String {
         if (reminders.isEmpty()) {
@@ -558,7 +558,7 @@ object NotificationAIReplyManager {
                 date == LocalDate.now().plusDays(1) -> "tomorrow"
                 else -> date.format(DateTimeFormatter.ofPattern("EEEE"))
             }
-            return "I have no scheduled events $dateStr, so I'm completely free!"
+            return "I have no scheduled events $dateStr, so I'm completely free! Any time works for me."
         }
 
         val dateStr = when {
@@ -574,16 +574,52 @@ object NotificationAIReplyManager {
                 ZoneId.systemDefault()
             ).toLocalTime()
             val timeStr = time.format(DateTimeFormatter.ofPattern("h:mm a"))
-            "${reminder.title} at $timeStr"
+            Pair(reminder.title, time)
         }
 
-        return when (busyTimes.size) {
-            1 -> "I have ${busyTimes[0]} $dateStr, but free otherwise"
-            2 -> "I have ${busyTimes[0]} and ${busyTimes[1]} $dateStr"
-            else -> {
-                val lastTime = busyTimes.last()
-                val otherTimes = busyTimes.dropLast(1).joinToString(", ")
-                "I have $otherTimes, and $lastTime $dateStr"
+        // Build busy times string
+        val busyDescription = busyTimes.map { (title, time) ->
+            "$title at ${time.format(DateTimeFormatter.ofPattern("h:mm a"))}"
+        }
+
+        // Find free time slots
+        val busySlots = busyTimes.map { (title, time) ->
+            BusySlot(title, time, time.plusHours(1))
+        }
+
+        val now = LocalDateTime.now()
+        val startHour = if (date == LocalDate.now() && now.hour >= 9) {
+            now.toLocalTime().plusHours(1).withMinute(0)
+        } else {
+            java.time.LocalTime.of(9, 0)
+        }
+
+        // Calculate free slots
+        val freeSlots = mutableListOf<String>()
+        var lastEndTime = startHour
+
+        for (slot in busySlots.sortedBy { it.startTime }) {
+            if (lastEndTime.isBefore(slot.startTime.minusMinutes(30))) {
+                freeSlots.add("before ${slot.startTime.format(DateTimeFormatter.ofPattern("h:mm a"))}")
+            }
+            lastEndTime = slot.endTime
+        }
+
+        // After last event
+        val lastEvent = busySlots.maxByOrNull { it.endTime }
+        if (lastEvent != null && lastEvent.endTime.isBefore(java.time.LocalTime.of(21, 0))) {
+            freeSlots.add("after ${lastEvent.endTime.format(DateTimeFormatter.ofPattern("h:mm a"))}")
+        }
+
+        return buildString {
+            append("I have ")
+            append(busyDescription.joinToString(" and "))
+            append(" $dateStr")
+
+            if (freeSlots.isNotEmpty()) {
+                append(". But I'm free ")
+                append(freeSlots.take(2).joinToString(" or "))
+                append(" - we could adjust to those times if needed!")
             }
         }
     }
@@ -715,7 +751,7 @@ object NotificationAIReplyManager {
     }
 
     /**
-     * Build persona context with schedule awareness
+     * Build persona context with schedule awareness and conflict handling
      */
     private fun buildScheduleAwarePersonaContext(
         userPersona: Map<String, Any>?,
@@ -735,17 +771,155 @@ object NotificationAIReplyManager {
 
         // Add schedule context if available
         if (!scheduleContext.isNullOrBlank()) {
-            contextBuilder.append("📅 SCHEDULE CONTEXT (IMPORTANT - Use this for availability questions):\n")
+            contextBuilder.append("📅 SCHEDULE CONTEXT (VERY IMPORTANT - Use this for availability questions):\n")
             contextBuilder.append(scheduleContext)
             contextBuilder.append("\n\n")
-            contextBuilder.append("When responding about availability, naturally incorporate this schedule information. ")
-            contextBuilder.append("Don't just say 'yes' or 'no' - mention when you're busy and when you're free. ")
-            contextBuilder.append("Sound natural, like a real person checking their calendar. ")
-            contextBuilder.append("Example: 'Tomorrow I have a meeting at 2pm, but I'm free after 4pm. What's up?'")
+            contextBuilder.append("RESPONSE GUIDELINES:\n")
+            contextBuilder.append("1. If you have a CONFLICT at the requested time:\n")
+            contextBuilder.append("   - Politely mention you're busy at that time\n")
+            contextBuilder.append("   - SUGGEST an alternative time when you're free\n")
+            contextBuilder.append("   - Example: 'I'm a bit busy at 11am with a meeting. How about we do it at 2pm instead? Or after 4pm works great for me!'\n")
+            contextBuilder.append("   - Example: 'That time doesn't work for me, but I'm free after 3pm. Would that work?'\n\n")
+            contextBuilder.append("2. If you're FREE at the requested time:\n")
+            contextBuilder.append("   - Confirm enthusiastically\n")
+            contextBuilder.append("   - Example: 'Yes! I'm free at 11am, sounds perfect! See you there!'\n\n")
+            contextBuilder.append("3. Always sound natural, friendly, and like a real person checking their calendar.\n")
+            contextBuilder.append("4. Don't just say 'no' - always offer alternatives when declining.\n")
         }
 
         return contextBuilder.toString()
     }
+
+    /**
+     * Build schedule context with conflict detection and alternative suggestions
+     */
+    suspend fun buildScheduleContextWithAlternatives(
+        targetDate: LocalDate,
+        requestedTime: java.time.LocalTime? = null
+    ): ScheduleContextResult {
+        val reminders = getScheduleForDate(targetDate)
+
+        if (reminders.isEmpty()) {
+            return ScheduleContextResult(
+                hasConflict = false,
+                scheduleDescription = "completely free",
+                busySlots = emptyList(),
+                suggestedAlternatives = emptyList()
+            )
+        }
+
+        val busySlots = reminders.map { reminder ->
+            val time = LocalDateTime.ofInstant(
+                java.time.Instant.ofEpochMilli(reminder.eventDate),
+                ZoneId.systemDefault()
+            ).toLocalTime()
+            BusySlot(
+                title = reminder.title,
+                startTime = time,
+                endTime = time.plusHours(1) // Assume 1 hour duration
+            )
+        }.sortedBy { it.startTime }
+
+        // Check if requested time conflicts
+        val hasConflict = if (requestedTime != null) {
+            busySlots.any { slot ->
+                val timeDiff = kotlin.math.abs(
+                    java.time.Duration.between(requestedTime, slot.startTime).toMinutes()
+                )
+                timeDiff < 60 // Within 1 hour
+            }
+        } else {
+            false
+        }
+
+        // Find free slots for alternatives
+        val suggestedAlternatives = findFreeTimeSlots(busySlots, targetDate)
+
+        val scheduleDescription = buildString {
+            append("busy at ")
+            append(busySlots.joinToString(", ") {
+                "${it.title} at ${it.startTime.format(DateTimeFormatter.ofPattern("h:mm a"))}"
+            })
+            if (suggestedAlternatives.isNotEmpty()) {
+                append(", but free ")
+                append(suggestedAlternatives.take(2).joinToString(" or ") {
+                    "after ${it.format(DateTimeFormatter.ofPattern("h:mm a"))}"
+                })
+            }
+        }
+
+        return ScheduleContextResult(
+            hasConflict = hasConflict,
+            scheduleDescription = scheduleDescription,
+            busySlots = busySlots,
+            suggestedAlternatives = suggestedAlternatives
+        )
+    }
+
+    /**
+     * Find free time slots given busy slots
+     */
+    private fun findFreeTimeSlots(
+        busySlots: List<BusySlot>,
+        date: LocalDate
+    ): List<java.time.LocalTime> {
+        val freeSlots = mutableListOf<java.time.LocalTime>()
+        val workdayStart = java.time.LocalTime.of(9, 0)
+        val workdayEnd = java.time.LocalTime.of(21, 0)
+
+        // Current time consideration for today
+        val now = LocalDateTime.now()
+        val startTime = if (date == LocalDate.now() && now.toLocalTime().isAfter(workdayStart)) {
+            now.toLocalTime().plusHours(1).withMinute(0) // Round to next hour
+        } else {
+            workdayStart
+        }
+
+        if (busySlots.isEmpty()) {
+            freeSlots.add(startTime)
+            return freeSlots
+        }
+
+        // Check time before first busy slot
+        val firstBusy = busySlots.first()
+        if (startTime.isBefore(firstBusy.startTime.minusHours(1))) {
+            freeSlots.add(startTime)
+        }
+
+        // Check gaps between busy slots
+        for (i in 0 until busySlots.size - 1) {
+            val currentEnd = busySlots[i].endTime
+            val nextStart = busySlots[i + 1].startTime
+
+            if (java.time.Duration.between(currentEnd, nextStart).toMinutes() >= 60) {
+                freeSlots.add(currentEnd)
+            }
+        }
+
+        // Check time after last busy slot
+        val lastBusy = busySlots.last()
+        if (lastBusy.endTime.isBefore(workdayEnd)) {
+            freeSlots.add(lastBusy.endTime)
+        }
+
+        return freeSlots.take(3) // Return up to 3 suggestions
+    }
+
+    /**
+     * Data class for schedule context result
+     */
+    data class ScheduleContextResult(
+        val hasConflict: Boolean,
+        val scheduleDescription: String,
+        val busySlots: List<BusySlot>,
+        val suggestedAlternatives: List<java.time.LocalTime>
+    )
+
+    data class BusySlot(
+        val title: String,
+        val startTime: java.time.LocalTime,
+        val endTime: java.time.LocalTime
+    )
 
     /**
      * Generate schedule-aware reply from a Message object with reminder intent detection
