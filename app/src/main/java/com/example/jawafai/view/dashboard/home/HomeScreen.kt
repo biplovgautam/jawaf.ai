@@ -43,7 +43,9 @@ import com.example.jawafai.R
 import com.example.jawafai.repository.ChatRepositoryImpl
 import com.example.jawafai.repository.UserRepositoryImpl
 import com.example.jawafai.ui.theme.AppFonts
+import com.example.jawafai.view.ui.theme.JawafAccent
 import com.example.jawafai.view.dashboard.notifications.ChatNotification
+import androidx.compose.ui.res.painterResource
 import com.example.jawafai.view.dashboard.notifications.ChatPlatform
 import com.example.jawafai.viewmodel.ChatViewModel
 import com.example.jawafai.viewmodel.ChatViewModelFactory
@@ -199,15 +201,11 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // App Name with enhanced styling
-                        Text(
-                            text = "जवाफ.AI",
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontFamily = AppFonts.KadwaFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 26.sp,
-                                color = Color(0xFF395B64)
-                            )
+                        // App Logo image
+                        Image(
+                            painter = painterResource(id = R.drawable.logotext),
+                            contentDescription = "Jawaf.AI Logo",
+                            modifier = Modifier.height(28.dp)
                         )
 
                         // Enhanced Username and Profile section
@@ -234,7 +232,7 @@ fun HomeScreen(
                                             fontFamily = AppFonts.KarlaFontFamily,
                                             fontSize = 15.sp,
                                             fontWeight = FontWeight.SemiBold,
-                                            color = Color(0xFF395B64)
+                                            color = JawafAccent
                                         )
                                     )
                                 }
@@ -245,7 +243,7 @@ fun HomeScreen(
                                         .size(36.dp)
                                         .clip(CircleShape)
                                         .background(Color(0xFFA5C9CA))
-                                        .border(2.dp, Color(0xFF395B64).copy(alpha = 0.2f), CircleShape)
+                                        .border(2.dp, JawafAccent.copy(alpha = 0.2f), CircleShape)
                                 ) {
                                     if (userImageUrl != null) {
                                         AsyncImage(
@@ -444,7 +442,7 @@ fun ChatBotSection(onChatBotClick: () -> Unit) {
             .fillMaxWidth()
             .clickable { onChatBotClick() },
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF395B64)),
+        colors = CardDefaults.cardColors(containerColor = JawafAccent),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Row(
@@ -528,7 +526,7 @@ fun SmartNotificationsSection(
                     fontFamily = AppFonts.KarlaFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
-                    color = Color(0xFF395B64)
+                    color = JawafAccent
                 )
             )
             TextButton(
@@ -539,7 +537,7 @@ fun SmartNotificationsSection(
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontFamily = AppFonts.KarlaFontFamily,
                         fontSize = 14.sp,
-                        color = Color(0xFF395B64)
+                        color = JawafAccent
                     )
                 )
             }
@@ -701,7 +699,7 @@ fun SmartNotificationItem(
                             fontFamily = AppFonts.KarlaFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp,
-                            color = Color(0xFF395B64)
+                            color = JawafAccent
                         )
                     )
 
@@ -765,7 +763,7 @@ fun RecentChatsSection(
                     fontFamily = AppFonts.KarlaFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
-                    color = Color(0xFF395B64)
+                    color = JawafAccent
                 )
             )
             TextButton(
@@ -776,7 +774,7 @@ fun RecentChatsSection(
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontFamily = AppFonts.KarlaFontFamily,
                         fontSize = 14.sp,
-                        color = Color(0xFF395B64)
+                        color = JawafAccent
                     )
                 )
             }
@@ -896,7 +894,7 @@ fun RecentChatItem(
                             fontFamily = AppFonts.KarlaFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp,
-                            color = Color(0xFF395B64)
+                            color = JawafAccent
                         ),
                         modifier = Modifier.weight(1f)
                     )
@@ -918,7 +916,7 @@ fun RecentChatItem(
                             Box(
                                 modifier = Modifier
                                     .background(
-                                        Color(0xFF395B64),
+                                        JawafAccent,
                                         CircleShape
                                     )
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
@@ -975,7 +973,7 @@ fun HeroSection(userFirstName: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF395B64)),
+        colors = CardDefaults.cardColors(containerColor = JawafAccent),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(
