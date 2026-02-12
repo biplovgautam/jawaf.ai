@@ -151,7 +151,17 @@ fun NotificationScreen(
         }
     }
 
-    // Map external notifications to ChatNotification for display
+    // Observe conversations from NotificationMemoryStore
+    val conversations by remember {
+        derivedStateOf {
+            NotificationMemoryStore.getAllConversations()
+        }
+    }
+
+    // State for selected conversation (null = showing inbox)
+    var selectedConversation by remember { mutableStateOf<String?>(null) }
+
+    // Map external notifications to ChatNotification for display (kept for compatibility)
     val liveNotifications = remember(externalNotifications) {
         externalNotifications.map { notification ->
             ChatNotification(
@@ -409,12 +419,18 @@ fun NotificationScreen(
             // Conditional rendering based on selected tab
             when (selectedTab) {
                 0 -> {
-                    // Smart Tab (existing functionality)
+                    // Smart Tab (conversation-based view)
                     SmartNotificationsContent(
+                        conversations = conversations,
+                        selectedConversation = selectedConversation,
+                        onConversationClick = { convoId ->
+                            selectedConversation = convoId
+                            NotificationMemoryStore.markConversationAsRead(convoId)
+                        },
+                        onBackToInbox = { selectedConversation = null },
                         selectedFilter = selectedFilter,
                         onFilterChange = { selectedFilter = it },
                         isRefreshing = isRefreshing,
-                        filteredNotifications = filteredNotifications,
                         generatingReplyFor = generatingReplyFor,
                         sendingStatus = sendingStatus,
                         sendingMessages = sendingMessages,
@@ -435,10 +451,13 @@ fun NotificationScreen(
 
 @Composable
 fun SmartNotificationsContent(
+    conversations: List<NotificationMemoryStore.Conversation>,
+    selectedConversation: String?,
+    onConversationClick: (String) -> Unit,
+    onBackToInbox: () -> Unit,
     selectedFilter: ChatPlatform?,
     onFilterChange: (ChatPlatform?) -> Unit,
     isRefreshing: Boolean,
-    filteredNotifications: List<ChatNotification>,
     generatingReplyFor: String?,
     sendingStatus: Map<String, RemoteReplyService.ReplyStatus>,
     sendingMessages: Map<String, String>,
@@ -448,7 +467,41 @@ fun SmartNotificationsContent(
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
+        if (selectedConversation == null) {
+            // Show Inbox (list of conversations)
+            ConversationInboxView(
+                conversations = conversations,
+                selectedFilter = selectedFilter,
+                onFilterChange = onFilterChange,
+                isRefreshing = isRefreshing,
+                onConversationClick = onConversationClick
+            )
+        } else {
+            // Show Chat View (messages in selected conversation)
+            ConversationChatView(
+                conversationId = selectedConversation,
+                onBackClick = onBackToInbox,
+                generatingReplyFor = generatingReplyFor,
+                sendingStatus = sendingStatus,
+                sendingMessages = sendingMessages,
+                onGenerateReply = onGenerateReply,
+                onSendReply = onSendReply
+            )
+        }
+    }
+}
 
+@Composable
+fun ConversationInboxView(
+    conversations: List<NotificationMemoryStore.Conversation>,
+    selectedFilter: ChatPlatform?,
+    onFilterChange: (ChatPlatform?) -> Unit,
+    isRefreshing: Boolean,
+    onConversationClick: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
             // Platform Filter Chips
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -466,7 +519,7 @@ fun SmartNotificationsContent(
                     )
                 }
 
-                items(ChatPlatform.values().toList()) { platform ->
+                items(ChatPlatform.entries.toList()) { platform ->
                     FilterChip(
                         onClick = {
                             onFilterChange(if (selectedFilter == platform) null else platform)
@@ -499,8 +552,27 @@ fun SmartNotificationsContent(
                 }
             }
 
-            // Notifications List
-            if (filteredNotifications.isEmpty()) {
+            // Filter conversations by selected platform
+            val filteredConversations = remember(conversations, selectedFilter) {
+                if (selectedFilter == null) {
+                    conversations
+                } else {
+                    conversations.filter { convo ->
+                        when (selectedFilter) {
+                            ChatPlatform.WHATSAPP -> convo.package_name.contains("whatsapp", true)
+                            ChatPlatform.INSTAGRAM -> convo.package_name.contains("instagram", true)
+                            ChatPlatform.MESSENGER -> convo.package_name.contains("messenger", true) ||
+                                                     convo.package_name.contains("facebook.orca", true)
+                            ChatPlatform.GENERAL -> !convo.package_name.contains("whatsapp", true) &&
+                                                   !convo.package_name.contains("instagram", true) &&
+                                                   !convo.package_name.contains("messenger", true)
+                        }
+                    }
+                }
+            }
+
+            // Conversations List (Inbox)
+            if (filteredConversations.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -511,14 +583,14 @@ fun SmartNotificationsContent(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Notifications,
-                            contentDescription = "No notifications",
+                            imageVector = Icons.Default.Forum,
+                            contentDescription = "No conversations",
                             modifier = Modifier.size(48.dp),
                             tint = Color(0xFF666666).copy(alpha = 0.5f)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "No notifications yet",
+                            text = "No conversations yet",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontFamily = AppFonts.KaiseiDecolFontFamily,
                                 fontSize = 16.sp,
@@ -530,17 +602,12 @@ fun SmartNotificationsContent(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(filteredNotifications) { notification ->
-                        EnhancedNotificationCard(
-                            notification = notification,
-                            onGenerateReply = { onGenerateReply(notification.notificationHash) },
-                            onSendReply = { onSendReply(notification.conversationId, notification.generatedReply) },
-                            onMarkAsRead = { /* Handle mark as read */ },
-                            isGeneratingReply = generatingReplyFor == notification.notificationHash,
-                            sendingStatus = sendingStatus[notification.conversationId],
-                            sentMessage = sendingMessages[notification.conversationId]
+                    items(filteredConversations) { conversation ->
+                        ConversationInboxItem(
+                            conversation = conversation,
+                            onClick = { onConversationClick(conversation.convo_id) }
                         )
                     }
 
@@ -549,6 +616,522 @@ fun SmartNotificationsContent(
                     }
                 }
             }
+    }
+}
+
+@Composable
+fun ConversationInboxItem(
+    conversation: NotificationMemoryStore.Conversation,
+    onClick: () -> Unit
+) {
+    val platform = when {
+        conversation.package_name.contains("whatsapp", true) -> ChatPlatform.WHATSAPP
+        conversation.package_name.contains("instagram", true) -> ChatPlatform.INSTAGRAM
+        conversation.package_name.contains("messenger", true) ||
+        conversation.package_name.contains("facebook.orca", true) -> ChatPlatform.MESSENGER
+        else -> ChatPlatform.GENERAL
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (conversation.unread_count > 0) Color(0xFFF0F8FF) else Color.White
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Avatar with platform indicator
+            Box {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFA5C9CA)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = conversation.display_name.firstOrNull()?.uppercase() ?: "?",
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontFamily = AppFonts.KarlaFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    )
+                }
+
+                // Platform badge
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .align(Alignment.BottomEnd)
+                        .clip(CircleShape)
+                        .background(platform.color),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(platform.color)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Conversation details
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = conversation.display_name,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontFamily = AppFonts.KarlaFontFamily,
+                            fontWeight = if (conversation.unread_count > 0) FontWeight.Bold else FontWeight.Normal,
+                            fontSize = 16.sp,
+                            color = Color(0xFF395B64)
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Text(
+                        text = formatTimestamp(conversation.last_msg_time),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = AppFonts.KaiseiDecolFontFamily,
+                            fontSize = 12.sp,
+                            color = Color(0xFF666666)
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = conversation.last_msg_content,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = AppFonts.KaiseiDecolFontFamily,
+                            fontSize = 14.sp,
+                            fontWeight = if (conversation.unread_count > 0) FontWeight.Medium else FontWeight.Normal,
+                            color = if (conversation.unread_count > 0) Color(0xFF333333) else Color(0xFF666666)
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    // Unread count badge
+                    if (conversation.unread_count > 0) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(Color(0xFF395B64))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = conversation.unread_count.toString(),
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = AppFonts.KarlaFontFamily,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ConversationChatView(
+    conversationId: String,
+    onBackClick: () -> Unit,
+    generatingReplyFor: String?,
+    sendingStatus: Map<String, RemoteReplyService.ReplyStatus>,
+    sendingMessages: Map<String, String>,
+    onGenerateReply: (String) -> Unit,
+    onSendReply: (String, String) -> Unit
+) {
+    val messages = remember(conversationId) {
+        NotificationMemoryStore.getMessagesForConversation(conversationId)
+    }
+
+    val conversation = remember(conversationId) {
+        NotificationMemoryStore.getAllConversations().find { it.convo_id == conversationId }
+    }
+
+    val platform = remember(conversation) {
+        when {
+            conversation?.package_name?.contains("whatsapp", true) == true -> ChatPlatform.WHATSAPP
+            conversation?.package_name?.contains("instagram", true) == true -> ChatPlatform.INSTAGRAM
+            conversation?.package_name?.contains("messenger", true) == true ||
+            conversation?.package_name?.contains("facebook.orca", true) == true -> ChatPlatform.MESSENGER
+            else -> ChatPlatform.GENERAL
+        }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // Chat header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFFF8F8F8))
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onBackClick,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Back to inbox",
+                    tint = Color(0xFF395B64)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Avatar
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFA5C9CA)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = conversation?.display_name?.firstOrNull()?.uppercase() ?: "?",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontFamily = AppFonts.KarlaFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = conversation?.display_name ?: "Unknown",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontFamily = AppFonts.KarlaFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = Color(0xFF395B64)
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(platform.color)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = platform.displayName,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = AppFonts.KaiseiDecolFontFamily,
+                            fontSize = 12.sp,
+                            color = Color(0xFF666666)
+                        )
+                    )
+                }
+            }
+        }
+
+        Divider(color = Color(0xFFE0E0E0), thickness = 1.dp)
+
+        // Messages list
+        if (messages.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No messages",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = AppFonts.KaiseiDecolFontFamily,
+                        fontSize = 16.sp,
+                        color = Color(0xFF666666)
+                    )
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(16.dp)
+            ) {
+                items(messages) { message ->
+                    MessageBubble(
+                        message = message,
+                        isGeneratingReply = generatingReplyFor == message.msg_hash,
+                        sendingStatus = sendingStatus[conversationId],
+                        sentMessage = sendingMessages[conversationId],
+                        onGenerateReply = { onGenerateReply(message.msg_hash) },
+                        onSendReply = { onSendReply(conversationId, message.ai_reply) }
+                    )
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MessageBubble(
+    message: NotificationMemoryStore.Message,
+    isGeneratingReply: Boolean,
+    sendingStatus: RemoteReplyService.ReplyStatus?,
+    sentMessage: String?,
+    onGenerateReply: () -> Unit,
+    onSendReply: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        // Original message
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = if (message.is_outgoing) Arrangement.End else Arrangement.Start
+        ) {
+            Card(
+                shape = if (message.is_outgoing) {
+                    RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomEnd = 4.dp, bottomStart = 16.dp)
+                } else {
+                    RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 16.dp)
+                },
+                colors = CardDefaults.cardColors(
+                    containerColor = if (message.is_outgoing) Color(0xFFDCF8C6) else Color(0xFFF0F0F0) // Green for outgoing, gray for incoming
+                ),
+                modifier = Modifier.widthIn(max = 280.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp)
+                ) {
+                    // Only show sender name for incoming messages
+                    if (!message.is_outgoing) {
+                        Text(
+                            text = message.sender_name,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = AppFonts.KarlaFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                color = Color(0xFF395B64)
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                    Text(
+                        text = message.msg_content,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = AppFonts.KaiseiDecolFontFamily,
+                            fontSize = 14.sp,
+                            color = Color(0xFF333333)
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.timestamp)),
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = AppFonts.KaiseiDecolFontFamily,
+                                fontSize = 11.sp,
+                                color = Color(0xFF999999)
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        // AI Reply if available
+        if (message.ai_reply.isNotBlank()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Card(
+                    shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomEnd = 4.dp, bottomStart = 16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1BC994)),
+                    modifier = Modifier.widthIn(max = 280.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = "AI Reply",
+                                modifier = Modifier.size(14.dp),
+                                tint = Color.White
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "AI Reply",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = AppFonts.KarlaFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    color = Color.White
+                                )
+                            )
+
+                            if (message.is_sent) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = "Sent",
+                                    modifier = Modifier.size(14.dp),
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = message.ai_reply,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontFamily = AppFonts.KaiseiDecolFontFamily,
+                                fontSize = 14.sp,
+                                color = Color.White
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        // Action buttons - Only show for INCOMING messages (not outgoing)
+        if (!message.is_sent && !message.is_outgoing) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                horizontalArrangement = Arrangement.End,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (!message.ai_reply.isNotBlank() && !isGeneratingReply) {
+                    OutlinedButton(
+                        onClick = onGenerateReply,
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFF395B64)
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = "Generate Reply",
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Generate Reply",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = AppFonts.KarlaFontFamily,
+                                fontSize = 12.sp
+                            )
+                        )
+                    }
+                }
+
+                if (isGeneratingReply) {
+                    OutlinedButton(
+                        onClick = { },
+                        enabled = false,
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFF395B64)
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                            color = Color(0xFF395B64)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Generating...",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = AppFonts.KarlaFontFamily,
+                                fontSize = 12.sp
+                            )
+                        )
+                    }
+                }
+
+                if (message.ai_reply.isNotBlank() && message.has_reply_action) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = onSendReply,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF1BC994)
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Send,
+                            contentDescription = "Send",
+                            modifier = Modifier.size(14.dp),
+                            tint = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Send",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = AppFonts.KarlaFontFamily,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1233,7 +1816,8 @@ fun RawNotificationCard(
                 RawDataField(label = "Title", value = notification.title)
                 RawDataField(label = "Text", value = notification.text)
                 RawDataField(label = "Package Name", value = notification.packageName)
-                RawDataField(label = "Timestamp", value = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(notification.time)))
+                RawDataField(label = "Timestamp (Formatted)", value = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(notification.time)))
+                RawDataField(label = "Timestamp (Raw)", value = notification.time.toString())
                 RawDataField(label = "Sender", value = notification.sender ?: "(null)")
                 RawDataField(label = "Conversation Title", value = notification.conversationTitle ?: "(null)")
                 RawDataField(label = "Conversation ID", value = notification.conversationId)
@@ -1267,12 +1851,16 @@ fun RawNotificationCard(
 
                 val context = LocalContext.current
                 val jsonString = remember(notification) {
+                    val formattedTime = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                        .format(Date(notification.time))
+
                     buildString {
                         appendLine("{")
                         appendLine("  \"title\": \"${notification.title}\",")
                         appendLine("  \"text\": \"${notification.text}\",")
                         appendLine("  \"packageName\": \"${notification.packageName}\",")
-                        appendLine("  \"time\": ${notification.time},")
+                        appendLine("  \"timestamp\": ${notification.time},")
+                        appendLine("  \"timestamp_formatted\": \"$formattedTime\",")
                         appendLine("  \"sender\": ${if (notification.sender != null) "\"${notification.sender}\"" else "null"},")
                         appendLine("  \"conversationTitle\": ${if (notification.conversationTitle != null) "\"${notification.conversationTitle}\"" else "null"},")
                         appendLine("  \"conversationId\": \"${notification.conversationId}\",")

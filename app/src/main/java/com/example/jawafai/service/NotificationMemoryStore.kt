@@ -4,10 +4,42 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import android.app.RemoteInput
 import android.app.Notification
+import android.util.Log
 import java.security.MessageDigest
 
 // Enhanced in-memory notification store for smart messaging assistant
 object NotificationMemoryStore {
+
+    // Table 1: Conversations (Inbox view)
+    // Note: display_name should always be the OTHER person's name (not "You" or current user)
+    // This matches how WhatsApp/Messenger show conversations
+    data class Conversation(
+        val convo_id: String,              // e.g., "com.whatsapp_170762839"
+        val package_name: String,          // e.g., "com.whatsapp"
+        val display_name: String,          // OTHER person's name (e.g., "Biplov Gautam")
+        val last_msg_time: Long,           // Timestamp for sorting
+        val last_msg_content: String,      // Last message preview
+        val platform_id: String? = null,   // Optional platform-specific ID
+        val unread_count: Int = 0          // Number of unread messages
+    )
+
+    // Table 2: Messages (Chat history)
+    // Note: sender_name identifies WHO sent each specific message
+    // This allows distinguishing between messages from different people in a conversation
+    data class Message(
+        val msg_id: String,                // Using hash as unique ID
+        val convo_id: String,              // Foreign key to Conversation
+        val sender_name: String,           // WHO sent this specific message (could be different people)
+        val msg_content: String,           // The text
+        val timestamp: Long,               // When it was sent
+        val is_outgoing: Boolean = false,  // True if from current user (all notifications are incoming)
+        val msg_hash: String,              // Deduplication
+        val has_reply_action: Boolean = false,
+        val ai_reply: String = "",
+        val is_sent: Boolean = false
+    )
+
+    // Original notification data (kept for compatibility)
     data class ExternalNotification(
         val title: String,                    // Group name or sender
         val text: String,                     // Message content
@@ -28,13 +60,49 @@ object NotificationMemoryStore {
     private val notifications: SnapshotStateList<ExternalNotification> = mutableStateListOf()
     private val notificationHashes: MutableSet<String> = mutableSetOf()
 
+    // Conversation-based storage
+    private val conversations: SnapshotStateList<Conversation> = mutableStateListOf()
+    private val messages: SnapshotStateList<Message> = mutableStateListOf()
+
+    /**
+     * Check if notification is a WhatsApp summary notification (not actual message)
+     * Examples: "2 new messages", "4 messages", "3 new messages from..."
+     */
+    private fun isSummaryNotification(text: String): Boolean {
+        val lowerText = text.lowercase().trim()
+
+        // Pattern 1: "X new messages" or "X messages"
+        val summaryPattern1 = Regex("^\\d+\\s+(new\\s+)?messages?$")
+        if (summaryPattern1.matches(lowerText)) return true
+
+        // Pattern 2: "X new messages from..." (group chat summary)
+        val summaryPattern2 = Regex("^\\d+\\s+new\\s+messages?\\s+from.*")
+        if (summaryPattern2.matches(lowerText)) return true
+
+        // Pattern 3: Single digit followed by "messages" (e.g., "2 messages")
+        if (lowerText.matches(Regex("^\\d{1,3}\\s+messages?$"))) return true
+
+        return false
+    }
+
     /**
      * Add notification with deduplication
+     * Also updates Conversations and Messages tables
+     * Filters out WhatsApp summary notifications
      */
     fun addNotification(notification: ExternalNotification): Boolean {
+        // Skip WhatsApp summary notifications (e.g., "2 new messages")
+        if (isSummaryNotification(notification.text)) {
+            Log.d("NotificationMemoryStore", "Skipping summary notification: ${notification.text}")
+            return false
+        }
+
         return if (!notificationHashes.contains(notification.hash)) {
             notifications.add(0, notification) // Add to top
             notificationHashes.add(notification.hash)
+
+            // Add to conversation-based storage
+            addToConversationStore(notification)
 
             // Limit store size to prevent memory issues
             if (notifications.size > 500) {
@@ -45,6 +113,144 @@ object NotificationMemoryStore {
         } else {
             false // Duplicate notification
         }
+    }
+
+    /**
+     * Add notification to conversation-based storage (Table 1 & 2)
+     */
+    private fun addToConversationStore(notification: ExternalNotification) {
+        val convo_id = notification.conversationId
+        val package_name = notification.packageName
+        val msg_content = notification.text
+        val timestamp = notification.time
+
+        // Determine if this is an outgoing message
+        // In WhatsApp: title = "You" means YOU sent the message (outgoing)
+        val title = notification.title
+        val sender = notification.sender
+        val is_outgoing = title.equals("You", ignoreCase = true)
+
+        // Determine sender name and display name
+        val sender_name: String
+        val should_update_display_name: Boolean
+
+        if (is_outgoing) {
+            // Outgoing message (You sent it)
+            // sender_name = "You" (for message bubble)
+            // DON'T update conversation display_name (keep showing the recipient's name)
+            sender_name = "You"
+            should_update_display_name = false
+        } else {
+            // Incoming message (Someone sent it to you)
+            // sender_name = actual sender
+            // DO update conversation display_name to show who sent it
+            sender_name = sender ?: title
+            should_update_display_name = true
+        }
+
+        // Update or create conversation (Table 1)
+        val existingConvoIndex = conversations.indexOfFirst { it.convo_id == convo_id }
+        if (existingConvoIndex != -1) {
+            // Update existing conversation
+            val existingConvo = conversations[existingConvoIndex]
+            conversations.removeAt(existingConvoIndex)
+            conversations.add(0, existingConvo.copy(
+                last_msg_time = timestamp,
+                last_msg_content = msg_content,
+                unread_count = if (is_outgoing) existingConvo.unread_count else existingConvo.unread_count + 1,
+                // Only update display_name if it's NOT an outgoing message
+                display_name = if (should_update_display_name) sender_name else existingConvo.display_name
+            ))
+        } else {
+            // Create new conversation
+            // For first message, use sender_name as display_name
+            // (If it's "You", we'll update it when we receive the first incoming message)
+            conversations.add(0, Conversation(
+                convo_id = convo_id,
+                package_name = package_name,
+                display_name = if (should_update_display_name) sender_name else "Unknown", // Will be updated on first incoming message
+                last_msg_time = timestamp,
+                last_msg_content = msg_content,
+                platform_id = null,
+                unread_count = if (is_outgoing) 0 else 1
+            ))
+        }
+
+        // Add message (Table 2)
+        val message = Message(
+            msg_id = notification.hash,
+            convo_id = convo_id,
+            sender_name = sender_name, // "You" if outgoing, actual sender if incoming
+            msg_content = msg_content,
+            timestamp = timestamp,
+            is_outgoing = is_outgoing,
+            msg_hash = notification.hash,
+            has_reply_action = notification.hasReplyAction,
+            ai_reply = notification.ai_reply,
+            is_sent = notification.is_sent
+        )
+        messages.add(0, message)
+
+        // Limit messages per conversation
+        val convoMessages = messages.filter { it.convo_id == convo_id }
+        if (convoMessages.size > 100) {
+            val oldestMessage = convoMessages.last()
+            messages.remove(oldestMessage)
+        }
+    }
+
+    /**
+     * Get all conversations sorted by last message time
+     */
+    fun getAllConversations(): List<Conversation> {
+        return conversations.sortedByDescending { it.last_msg_time }
+    }
+
+    /**
+     * Get messages for a specific conversation
+     */
+    fun getMessagesForConversation(convo_id: String): List<Message> {
+        return messages.filter { it.convo_id == convo_id }.sortedBy { it.timestamp }
+    }
+
+    /**
+     * Mark conversation as read
+     */
+    fun markConversationAsRead(convo_id: String) {
+        val index = conversations.indexOfFirst { it.convo_id == convo_id }
+        if (index != -1) {
+            conversations[index] = conversations[index].copy(unread_count = 0)
+        }
+    }
+
+    /**
+     * Update AI reply for a message
+     */
+    fun updateMessageAIReply(msg_hash: String, aiReply: String): Boolean {
+        val msgIndex = messages.indexOfFirst { it.msg_hash == msg_hash }
+        if (msgIndex != -1) {
+            messages[msgIndex] = messages[msgIndex].copy(ai_reply = aiReply)
+
+            // Also update in notifications list
+            updateAIReply(msg_hash, aiReply)
+            return true
+        }
+        return false
+    }
+
+    /**
+     * Mark message as sent
+     */
+    fun markMessageAsSent(msg_hash: String): Boolean {
+        val msgIndex = messages.indexOfFirst { it.msg_hash == msg_hash }
+        if (msgIndex != -1) {
+            messages[msgIndex] = messages[msgIndex].copy(is_sent = true)
+
+            // Also update in notifications list
+            markAsSent(msg_hash)
+            return true
+        }
+        return false
     }
 
     /**
@@ -74,11 +280,13 @@ object NotificationMemoryStore {
     }
 
     /**
-     * Clear all notifications
+     * Clear all notifications, conversations, and messages
      */
     fun clear() {
         notifications.clear()
         notificationHashes.clear()
+        conversations.clear()
+        messages.clear()
     }
 
     /**
