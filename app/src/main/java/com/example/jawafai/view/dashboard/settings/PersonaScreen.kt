@@ -162,7 +162,7 @@ fun PersonaScreen(
                             fontFamily = AppFonts.KarlaFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 24.sp,
-                            color = Color(0xFF395B64)
+                            color = Color(0xFF191919)
                         )
                     )
                 },
@@ -171,7 +171,7 @@ fun PersonaScreen(
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Back",
-                            tint = Color(0xFF395B64)
+                            tint = Color(0xFF191919)
                         )
                     }
                 },
@@ -180,7 +180,7 @@ fun PersonaScreen(
                         onClick = { savePersona() },
                         enabled = !isLoading.value,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF395B64)
+                            containerColor = Color(0xFF1BC994)
                         )
                     ) {
                         Text(
@@ -226,7 +226,7 @@ fun PersonaScreen(
                                 verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
                                 CircularProgressIndicator(
-                                    color = Color(0xFF395B64)
+                                    color = Color(0xFF1BC994)
                                 )
                                 Text(
                                     text = "Loading your persona...",
@@ -268,7 +268,7 @@ fun PersonaScreen(
                                             fontFamily = AppFonts.KarlaFontFamily,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 20.sp,
-                                            color = Color(0xFF395B64)
+                                            color = Color(0xFF191919)
                                         )
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
@@ -312,7 +312,7 @@ fun PersonaScreen(
                                         style = MaterialTheme.typography.bodyMedium.copy(
                                             fontFamily = AppFonts.KarlaFontFamily,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF395B64)
+                                            color = Color(0xFF191919)
                                         )
                                     )
                                     Text(
@@ -320,7 +320,7 @@ fun PersonaScreen(
                                         style = MaterialTheme.typography.bodyMedium.copy(
                                             fontFamily = AppFonts.KarlaFontFamily,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF395B64)
+                                            color = Color(0xFF1BC994)
                                         )
                                     )
                                 }
@@ -328,7 +328,7 @@ fun PersonaScreen(
                                 LinearProgressIndicator(
                                     progress = progress,
                                     modifier = Modifier.fillMaxWidth(),
-                                    color = Color(0xFF395B64),
+                                    color = Color(0xFF1BC994),
                                     trackColor = Color(0xFFE0E0E0)
                                 )
                             }
@@ -368,6 +368,14 @@ fun PersonaQuestionCard(
     answer: String,
     onAnswerChanged: (String) -> Unit
 ) {
+    // Track if "Other" option is selected
+    val isOtherSelected = remember(answer, question.options) {
+        question.options?.contains(answer) == false && answer.isNotBlank()
+    }
+    var otherText by remember(answer) {
+        mutableStateOf(if (isOtherSelected) answer else "")
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -388,7 +396,7 @@ fun PersonaQuestionCard(
                     modifier = Modifier
                         .size(24.dp)
                         .background(
-                            color = if (answer.isNotBlank()) Color(0xFF395B64) else Color(0xFFE0E0E0),
+                            color = if (answer.isNotBlank()) Color(0xFF1BC994) else Color(0xFFE0E0E0),
                             shape = androidx.compose.foundation.shape.CircleShape
                         ),
                     contentAlignment = Alignment.Center
@@ -412,7 +420,7 @@ fun PersonaQuestionCard(
                         fontFamily = AppFonts.KarlaFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
-                        color = Color(0xFF395B64)
+                        color = Color(0xFF191919)
                     ),
                     modifier = Modifier.weight(1f)
                 )
@@ -428,23 +436,27 @@ fun PersonaQuestionCard(
                             .selectableGroup()
                             .fillMaxWidth()
                     ) {
+                        // Display the 4 default options
                         question.options?.forEach { option ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .selectable(
-                                        selected = (option == answer),
-                                        onClick = { onAnswerChanged(option) },
+                                        selected = (option == answer && !isOtherSelected),
+                                        onClick = {
+                                            otherText = ""
+                                            onAnswerChanged(option)
+                                        },
                                         role = Role.RadioButton
                                     )
                                     .padding(vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 RadioButton(
-                                    selected = (option == answer),
+                                    selected = (option == answer && !isOtherSelected),
                                     onClick = null, // null because the parent is selectable
                                     colors = RadioButtonDefaults.colors(
-                                        selectedColor = Color(0xFF395B64),
+                                        selectedColor = Color(0xFF1BC994),
                                         unselectedColor = Color(0xFF666666)
                                     )
                                 )
@@ -454,10 +466,90 @@ fun PersonaQuestionCard(
                                     style = MaterialTheme.typography.bodyMedium.copy(
                                         fontFamily = AppFonts.KaiseiDecolFontFamily,
                                         fontSize = 14.sp,
-                                        color = Color(0xFF395B64)
+                                        color = Color(0xFF191919)
                                     )
                                 )
                             }
+                        }
+
+                        // "Other (your way)" option with text input
+                        if (question.allowOther) {
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            // Other option row
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .selectable(
+                                        selected = isOtherSelected,
+                                        onClick = {
+                                            // Select "Other" but don't clear existing other text
+                                            if (otherText.isNotBlank()) {
+                                                onAnswerChanged(otherText)
+                                            }
+                                        },
+                                        role = Role.RadioButton
+                                    )
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = isOtherSelected,
+                                    onClick = null,
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = Color(0xFF1BC994),
+                                        unselectedColor = Color(0xFF666666)
+                                    )
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = "Other (your way)",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontFamily = AppFonts.KaiseiDecolFontFamily,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color(0xFF1BC994)
+                                    )
+                                )
+                            }
+
+                            // Custom input field for "Other"
+                            OutlinedTextField(
+                                value = otherText,
+                                onValueChange = { newText ->
+                                    otherText = newText
+                                    if (newText.isNotBlank()) {
+                                        onAnswerChanged(newText)
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 36.dp), // Align with options
+                                placeholder = {
+                                    Text(
+                                        "Type your own answer...",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontFamily = AppFonts.KaiseiDecolFontFamily,
+                                            color = Color(0xFF999999)
+                                        )
+                                    )
+                                },
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = Color(0xFF1BC994),
+                                    unfocusedBorderColor = if (isOtherSelected) Color(0xFF1BC994).copy(alpha = 0.5f) else Color(0xFFE0E0E0),
+                                    focusedTextColor = Color(0xFF191919),
+                                    unfocusedTextColor = Color(0xFF191919),
+                                    cursorColor = Color(0xFF1BC994),
+                                    focusedContainerColor = Color(0xFFFAFAFA),
+                                    unfocusedContainerColor = Color(0xFFFAFAFA)
+                                ),
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = AppFonts.KaiseiDecolFontFamily,
+                                    fontSize = 14.sp
+                                )
+                            )
                         }
                     }
                 }
@@ -471,7 +563,7 @@ fun PersonaQuestionCard(
                                 "Write your answer here...",
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     fontFamily = AppFonts.KaiseiDecolFontFamily,
-                                    color = Color(0xFF666666)
+                                    color = Color(0xFF999999)
                                 )
                             )
                         },
@@ -479,11 +571,13 @@ fun PersonaQuestionCard(
                         maxLines = 6,
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF395B64),
+                            focusedBorderColor = Color(0xFF1BC994),
                             unfocusedBorderColor = Color(0xFFE0E0E0),
-                            focusedTextColor = Color(0xFF395B64),
-                            unfocusedTextColor = Color(0xFF395B64),
-                            cursorColor = Color(0xFF395B64)
+                            focusedTextColor = Color(0xFF191919),
+                            unfocusedTextColor = Color(0xFF191919),
+                            cursorColor = Color(0xFF1BC994),
+                            focusedContainerColor = Color(0xFFFAFAFA),
+                            unfocusedContainerColor = Color(0xFFFAFAFA)
                         ),
                         textStyle = MaterialTheme.typography.bodyMedium.copy(
                             fontFamily = AppFonts.KaiseiDecolFontFamily,
