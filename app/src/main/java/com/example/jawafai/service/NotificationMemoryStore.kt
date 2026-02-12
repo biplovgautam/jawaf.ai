@@ -66,7 +66,7 @@ object NotificationMemoryStore {
 
     /**
      * Check if notification is a WhatsApp summary notification (not actual message)
-     * Examples: "2 new messages", "4 messages", "3 new messages from..."
+     * Examples: "2 new messages", "4 messages", "3 new messages from...", "2 messages from 2 chats"
      */
     private fun isSummaryNotification(text: String): Boolean {
         val lowerText = text.lowercase().trim()
@@ -81,6 +81,14 @@ object NotificationMemoryStore {
 
         // Pattern 3: Single digit followed by "messages" (e.g., "2 messages")
         if (lowerText.matches(Regex("^\\d{1,3}\\s+messages?$"))) return true
+
+        // Pattern 4: "X messages from X chats" (WhatsApp multiple chat summary)
+        val summaryPattern4 = Regex("^\\d+\\s+messages?\\s+from\\s+\\d+\\s+chats?$")
+        if (summaryPattern4.matches(lowerText)) return true
+
+        // Pattern 5: "X new messages from X chats"
+        val summaryPattern5 = Regex("^\\d+\\s+new\\s+messages?\\s+from\\s+\\d+\\s+chats?$")
+        if (summaryPattern5.matches(lowerText)) return true
 
         return false
     }

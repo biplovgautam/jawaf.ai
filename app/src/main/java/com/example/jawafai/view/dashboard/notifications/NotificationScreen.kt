@@ -904,7 +904,7 @@ fun ConversationChatView(
                         sendingStatus = sendingStatus[conversationId],
                         sentMessage = sendingMessages[conversationId],
                         onGenerateReply = { onGenerateReply(message.msg_hash) },
-                        onSendReply = { onSendReply(conversationId, message.ai_reply) }
+                        onSendReply = { editedReply -> onSendReply(conversationId, editedReply) }
                     )
                 }
 
@@ -923,8 +923,12 @@ fun MessageBubble(
     sendingStatus: RemoteReplyService.ReplyStatus?,
     sentMessage: String?,
     onGenerateReply: () -> Unit,
-    onSendReply: () -> Unit
+    onSendReply: (String) -> Unit  // Changed to accept edited reply text
 ) {
+    // State for editable AI reply
+    var editableReply by remember(message.ai_reply) { mutableStateOf(message.ai_reply) }
+    var isEditing by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -1032,14 +1036,44 @@ fun MessageBubble(
                             }
                         }
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = message.ai_reply,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontFamily = AppFonts.KaiseiDecolFontFamily,
-                                fontSize = 14.sp,
-                                color = Color.White
+
+                        // Show TextField if not sent (editable), otherwise show Text (read-only)
+                        if (!message.is_sent) {
+                            TextField(
+                                value = editableReply,
+                                onValueChange = {
+                                    editableReply = it
+                                    isEditing = true
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = AppFonts.KaiseiDecolFontFamily,
+                                    fontSize = 14.sp,
+                                    color = Color.White
+                                ),
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color(0xFF1BC994),
+                                    unfocusedContainerColor = Color(0xFF1BC994),
+                                    disabledContainerColor = Color(0xFF1BC994),
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    cursorColor = Color.White,
+                                    focusedIndicatorColor = Color.White.copy(alpha = 0.5f),
+                                    unfocusedIndicatorColor = Color.Transparent
+                                ),
+                                minLines = 2,
+                                maxLines = 6
                             )
-                        )
+                        } else {
+                            Text(
+                                text = message.ai_reply,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = AppFonts.KaiseiDecolFontFamily,
+                                    fontSize = 14.sp,
+                                    color = Color.White
+                                )
+                            )
+                        }
                     }
                 }
             }
@@ -1106,7 +1140,7 @@ fun MessageBubble(
                 if (message.ai_reply.isNotBlank() && message.has_reply_action) {
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
-                        onClick = onSendReply,
+                        onClick = { onSendReply(editableReply) },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF1BC994)
                         ),
@@ -1121,7 +1155,7 @@ fun MessageBubble(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Send",
+                            text = if (isEditing) "Send Edit" else "Send",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 fontFamily = AppFonts.KarlaFontFamily,
                                 fontSize = 12.sp,
