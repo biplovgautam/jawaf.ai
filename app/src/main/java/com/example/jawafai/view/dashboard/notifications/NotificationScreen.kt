@@ -345,17 +345,17 @@ fun ConversationCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
             ),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (hasUnread) Color.White else Color(0xFFFAFAFA)
         ),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = if (hasUnread) 2.dp else 0.dp
+            defaultElevation = if (hasUnread) 4.dp else 1.dp
         )
     ) {
         Row(
@@ -371,19 +371,16 @@ fun ConversationCard(
                     modifier = Modifier
                         .size(56.dp)
                         .clip(CircleShape)
-                        .background(
-                            if (hasUnread) JawafAccent.copy(alpha = 0.15f)
-                            else Color(0xFFE8E8E8)
-                        ),
+                        .background(platform.color.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = conversation.display_name.firstOrNull()?.uppercase() ?: "?",
+                        text = conversation.display_name.take(2).uppercase(),
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontFamily = AppFonts.KarlaFontFamily,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 22.sp,
-                            color = if (hasUnread) JawafAccent else Color(0xFF666666)
+                            fontSize = 18.sp,
+                            color = platform.color
                         )
                     )
                 }
@@ -393,7 +390,7 @@ fun ConversationCard(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .offset(x = 2.dp, y = 2.dp)
-                        .size(18.dp)
+                        .size(20.dp)
                         .clip(CircleShape)
                         .background(Color.White)
                         .padding(2.dp)
@@ -423,7 +420,7 @@ fun ConversationCard(
                         text = conversation.display_name,
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontFamily = AppFonts.KarlaFontFamily,
-                            fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.Medium,
+                            fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.SemiBold,
                             fontSize = 16.sp,
                             color = JawafText
                         ),
@@ -437,11 +434,23 @@ fun ConversationCard(
                         text = formatRelativeTime(conversation.last_msg_time),
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontFamily = AppFonts.KaiseiDecolFontFamily,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             color = if (hasUnread) JawafAccent else Color(0xFF999999)
                         )
                     )
                 }
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                // Platform tag
+                Text(
+                    text = platform.displayName,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontFamily = AppFonts.KaiseiDecolFontFamily,
+                        fontSize = 10.sp,
+                        color = platform.color
+                    )
+                )
 
                 Spacer(modifier = Modifier.height(4.dp))
 
@@ -455,7 +464,7 @@ fun ConversationCard(
                         text = conversation.last_msg_content,
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontFamily = AppFonts.KaiseiDecolFontFamily,
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             color = if (hasUnread) Color(0xFF444444) else Color(0xFF888888)
                         ),
                         maxLines = 1,

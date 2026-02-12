@@ -209,24 +209,6 @@ fun AnalyticsScreen() {
             }
     }
 
-    // Generate AI insight on first load
-    LaunchedEffect(communicationHealthScore, replySpeed, ghostingRate, consistency, engagement) {
-        if (aiInsight == null && !isLoadingInsight && totalMessages > 0) {
-            isLoadingInsight = true
-            coroutineScope.launch {
-                aiInsight = generateAIInsight(
-                    healthScore = communicationHealthScore,
-                    replySpeed = replySpeed,
-                    ghostingRate = ghostingRate,
-                    consistency = consistency,
-                    engagement = engagement,
-                    totalMessages = totalMessages
-                )
-                isLoadingInsight = false
-            }
-        }
-    }
-
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -501,7 +483,7 @@ private fun getPlatformColor(packageName: String): Color {
 }
 
 /**
- * Generate AI insight based on metrics
+ * Generate AI insight based on metrics - SHORT and informative
  */
 private suspend fun generateAIInsight(
     healthScore: Int,
@@ -513,24 +495,14 @@ private suspend fun generateAIInsight(
 ): String {
     return try {
         val prompt = """
-Generate a SHORT, friendly insight (max 2 sentences) about someone's communication habits based on these metrics:
-- Communication Health: $healthScore%
-- Reply Speed: $replySpeed% (higher = faster replies)
-- Ghosting Rate: $ghostingRate% (percentage of messages left unanswered)  
-- Consistency: $consistency% (how regularly they respond)
-- Engagement: $engagement% (conversation activity level)
-- Total Messages: $totalMessages
-
-Be encouraging but honest. Use casual language and maybe an emoji. Focus on the most notable metric (good or needs improvement).
-Examples:
-- "You're a reply champion! 🏆 Your fast responses show you really value your connections."
-- "Looks like a few messages slipped through the cracks. Maybe check your unreads? 📬"
-- "Consistent communicator alert! Your friends know they can count on you. ✨"
+Generate ONE short sentence (max 15 words) about communication habits. Include one emoji.
+Metrics: Health $healthScore%, Speed $replySpeed%, Ghosting $ghostingRate%, Consistency $consistency%, Engagement $engagement%
+Be friendly and focus on the most notable metric. No markdown.
         """.trimIndent()
 
         val response = GroqApiManager.getChatResponse(prompt, emptyList())
         if (response.success && response.message != null) {
-            response.message.trim().take(200)
+            response.message.trim().take(100)
         } else {
             getDefaultInsight(healthScore, ghostingRate)
         }
@@ -666,60 +638,119 @@ fun CommunicationHealthCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // AI Insight Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.White.copy(alpha = 0.1f)
-                )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.Top
+            // Generate Insight Button
+            if (aiInsight == null && !isLoadingInsight) {
+                OutlinedButton(
+                    onClick = onRefreshInsight,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = JawafAccent
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, JawafAccent)
                 ) {
                     Icon(
                         imageVector = Icons.Filled.AutoAwesome,
                         contentDescription = null,
-                        tint = JawafAccent,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    if (isLoadingInsight) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Generate AI Insight",
+                        fontFamily = AppFonts.KarlaFontFamily,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp
+                    )
+                }
+            } else {
+                // AI Insight Card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color.White.copy(alpha = 0.1f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.Top
                         ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                color = JawafAccent,
-                                strokeWidth = 2.dp
+                            Icon(
+                                imageVector = Icons.Filled.AutoAwesome,
+                                contentDescription = null,
+                                tint = JawafAccent,
+                                modifier = Modifier.size(18.dp)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Generating insight...",
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontFamily = AppFonts.KaiseiDecolFontFamily,
-                                    fontSize = 13.sp,
-                                    color = Color.White.copy(alpha = 0.8f)
+                            Spacer(modifier = Modifier.width(10.dp))
+
+                            if (isLoadingInsight) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        color = JawafAccent,
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Analyzing...",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontFamily = AppFonts.KaiseiDecolFontFamily,
+                                            fontSize = 12.sp,
+                                            color = Color.White.copy(alpha = 0.8f)
+                                        )
+                                    )
+                                }
+                            } else {
+                                Text(
+                                    text = aiInsight ?: "",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontFamily = AppFonts.KaiseiDecolFontFamily,
+                                        fontSize = 12.sp,
+                                        color = Color.White,
+                                        lineHeight = 18.sp
+                                    ),
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                            )
+                            }
                         }
-                    } else {
-                        Text(
-                            text = aiInsight ?: "Analyzing your communication patterns...",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontFamily = AppFonts.KaiseiDecolFontFamily,
-                                fontSize = 13.sp,
-                                color = Color.White,
-                                lineHeight = 20.sp
-                            ),
-                            modifier = Modifier.weight(1f)
-                        )
+
+                        // Regenerate button
+                        if (!isLoadingInsight && aiInsight != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                TextButton(
+                                    onClick = onRefreshInsight,
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Refresh,
+                                        contentDescription = null,
+                                        tint = JawafAccent,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Refresh",
+                                        color = JawafAccent,
+                                        fontSize = 11.sp,
+                                        fontFamily = AppFonts.KarlaFontFamily
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
