@@ -81,21 +81,30 @@ fun NotificationScreen(
     var conversationToDelete by remember { mutableStateOf<NotificationMemoryStore.Conversation?>(null) }
     var isDeleting by remember { mutableStateOf(false) }
 
-    // Get conversations from memory store
-    val conversations = remember { NotificationMemoryStore.getAllConversations() }
+    // Get conversations from memory store - use observable state for reactivity
+    val conversationsState = NotificationMemoryStore.getConversationsState()
+
+    // Create sorted list that updates when state changes
+    val conversations by remember {
+        derivedStateOf {
+            conversationsState.sortedByDescending { it.last_msg_time }
+        }
+    }
 
     // Filter conversations by platform
-    val filteredConversations = remember(conversations.size, selectedFilter) {
-        if (selectedFilter == ChatPlatform.ALL) {
-            conversations.toList()
-        } else {
-            conversations.filter { convo ->
-                when (selectedFilter) {
-                    ChatPlatform.WHATSAPP -> convo.package_name.contains("whatsapp", true)
-                    ChatPlatform.INSTAGRAM -> convo.package_name.contains("instagram", true)
-                    ChatPlatform.MESSENGER -> convo.package_name.contains("messenger", true) ||
-                            convo.package_name.contains("facebook.orca", true)
-                    else -> true
+    val filteredConversations by remember(selectedFilter) {
+        derivedStateOf {
+            if (selectedFilter == ChatPlatform.ALL) {
+                conversations
+            } else {
+                conversations.filter { convo ->
+                    when (selectedFilter) {
+                        ChatPlatform.WHATSAPP -> convo.package_name.contains("whatsapp", true)
+                        ChatPlatform.INSTAGRAM -> convo.package_name.contains("instagram", true)
+                        ChatPlatform.MESSENGER -> convo.package_name.contains("messenger", true) ||
+                                convo.package_name.contains("facebook.orca", true)
+                        else -> true
+                    }
                 }
             }
         }

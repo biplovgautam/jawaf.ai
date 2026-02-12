@@ -5,10 +5,18 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import android.app.RemoteInput
 import android.app.Notification
 import android.util.Log
+import com.example.jawafai.managers.NotificationFirebaseManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.security.MessageDigest
 
 // Enhanced in-memory notification store for smart messaging assistant
 object NotificationMemoryStore {
+
+    // Coroutine scope for Firebase operations
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // Table 1: Conversations (Inbox view)
     // Note: display_name should always be the OTHER person's name (not "You" or current user)
@@ -308,11 +316,42 @@ object NotificationMemoryStore {
         )
         messages.add(0, message)
 
+        // Sync to Firebase in background
+        syncToFirebase(convo_id, message)
+
         // Limit messages per conversation
         val convoMessages = messages.filter { it.convo_id == convo_id }
         if (convoMessages.size > 100) {
             val oldestMessage = convoMessages.last()
             messages.remove(oldestMessage)
+        }
+    }
+
+    /**
+     * Sync conversation and message to Firebase Realtime Database
+     */
+    private fun syncToFirebase(convoId: String, message: Message) {
+        scope.launch {
+            try {
+                // Get the conversation
+                val conversation = conversations.find { it.convo_id == convoId }
+
+                // Save conversation to Firebase
+                conversation?.let {
+                    val saved = NotificationFirebaseManager.saveConversation(it)
+                    if (saved) {
+                        Log.d("NotificationMemoryStore", "✅ Synced conversation to Firebase: $convoId")
+                    }
+                }
+
+                // Save message to Firebase
+                val msgSaved = NotificationFirebaseManager.saveMessage(message)
+                if (msgSaved) {
+                    Log.d("NotificationMemoryStore", "✅ Synced message to Firebase: ${message.msg_id}")
+                }
+            } catch (e: Exception) {
+                Log.e("NotificationMemoryStore", "❌ Firebase sync failed: ${e.message}")
+            }
         }
     }
 
@@ -324,10 +363,52 @@ object NotificationMemoryStore {
     }
 
     /**
+     * Get conversations as observable state (for Compose reactivity)
+     */
+    fun getConversationsState(): SnapshotStateList<Conversation> {
+        return conversations
+    }
+
+    /**
      * Get all messages (for analytics)
      */
     fun getAllMessages(): List<Message> {
         return messages.toList()
+    }
+
+    /**
+     * Get messages as observable state (for Compose reactivity)
+     */
+    fun getMessagesState(): SnapshotStateList<Message> {
+        return messages
+    }
+
+    /**
+     * Add conversation from Firebase (without syncing back to Firebase)
+     */
+    fun addConversationFromFirebase(conversation: Conversation) {
+        // Check if already exists
+        val existingIndex = conversations.indexOfFirst { it.convo_id == conversation.convo_id }
+        if (existingIndex != -1) {
+            // Update if newer
+            if (conversation.last_msg_time > conversations[existingIndex].last_msg_time) {
+                conversations[existingIndex] = conversation
+            }
+        } else {
+            conversations.add(conversation)
+        }
+    }
+
+    /**
+     * Add message from Firebase (without syncing back to Firebase)
+     */
+    fun addMessageFromFirebase(message: Message) {
+        // Check if already exists
+        val exists = messages.any { it.msg_hash == message.msg_hash }
+        if (!exists) {
+            messages.add(message)
+            notificationHashes.add(message.msg_hash)
+        }
     }
 
     /**
@@ -343,7 +424,18 @@ object NotificationMemoryStore {
     fun markConversationAsRead(convo_id: String) {
         val index = conversations.indexOfFirst { it.convo_id == convo_id }
         if (index != -1) {
-            conversations[index] = conversations[index].copy(unread_count = 0)
+            val updatedConvo = conversations[index].copy(unread_count = 0)
+            conversations[index] = updatedConvo
+
+            // Sync to Firebase
+            scope.launch {
+                try {
+                    NotificationFirebaseManager.saveConversation(updatedConvo)
+                    Log.d("NotificationMemoryStore", "✅ Synced read status to Firebase")
+                } catch (e: Exception) {
+                    Log.e("NotificationMemoryStore", "❌ Failed to sync read status: ${e.message}")
+                }
+            }
         }
     }
 
@@ -353,10 +445,22 @@ object NotificationMemoryStore {
     fun updateMessageAIReply(msg_hash: String, aiReply: String): Boolean {
         val msgIndex = messages.indexOfFirst { it.msg_hash == msg_hash }
         if (msgIndex != -1) {
-            messages[msgIndex] = messages[msgIndex].copy(ai_reply = aiReply)
+            val message = messages[msgIndex]
+            messages[msgIndex] = message.copy(ai_reply = aiReply)
 
             // Also update in notifications list
             updateAIReply(msg_hash, aiReply)
+
+            // Sync to Firebase
+            scope.launch {
+                try {
+                    NotificationFirebaseManager.updateAIReply(message.convo_id, msg_hash, aiReply)
+                    Log.d("NotificationMemoryStore", "✅ Synced AI reply to Firebase")
+                } catch (e: Exception) {
+                    Log.e("NotificationMemoryStore", "❌ Failed to sync AI reply: ${e.message}")
+                }
+            }
+
             return true
         }
         return false
@@ -368,10 +472,22 @@ object NotificationMemoryStore {
     fun markMessageAsSent(msg_hash: String): Boolean {
         val msgIndex = messages.indexOfFirst { it.msg_hash == msg_hash }
         if (msgIndex != -1) {
-            messages[msgIndex] = messages[msgIndex].copy(is_sent = true)
+            val message = messages[msgIndex]
+            messages[msgIndex] = message.copy(is_sent = true)
 
             // Also update in notifications list
             markAsSent(msg_hash)
+
+            // Sync to Firebase
+            scope.launch {
+                try {
+                    NotificationFirebaseManager.markMessageAsSent(message.convo_id, msg_hash)
+                    Log.d("NotificationMemoryStore", "✅ Synced sent status to Firebase")
+                } catch (e: Exception) {
+                    Log.e("NotificationMemoryStore", "❌ Failed to sync sent status: ${e.message}")
+                }
+            }
+
             return true
         }
         return false

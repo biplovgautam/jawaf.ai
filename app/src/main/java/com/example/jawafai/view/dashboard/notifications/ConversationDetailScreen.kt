@@ -61,14 +61,19 @@ fun ConversationDetailScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
 
-    // Get conversation and messages
-    val conversation = remember(conversationId) {
-        NotificationMemoryStore.getAllConversations().find { it.convo_id == conversationId }
+    // Get conversation and messages - use observable state for reactivity
+    val conversationsState = NotificationMemoryStore.getConversationsState()
+    val messagesState = NotificationMemoryStore.getMessagesState()
+
+    val conversation by remember(conversationId) {
+        derivedStateOf {
+            conversationsState.find { it.convo_id == conversationId }
+        }
     }
 
-    val messages by remember {
+    val messages by remember(conversationId) {
         derivedStateOf {
-            NotificationMemoryStore.getMessagesForConversation(conversationId)
+            messagesState.filter { it.convo_id == conversationId }.sortedBy { it.timestamp }
         }
     }
 

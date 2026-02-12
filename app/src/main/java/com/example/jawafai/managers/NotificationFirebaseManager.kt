@@ -55,6 +55,102 @@ object NotificationFirebaseManager {
     }
 
     /**
+     * Load all conversations and messages from Firebase into NotificationMemoryStore
+     * Call this on app startup to restore previous data
+     */
+    suspend fun loadFromFirebase(): Boolean {
+        val userRef = getUserRef() ?: run {
+            Log.d(TAG, "No user logged in, skipping Firebase load")
+            return false
+        }
+
+        return try {
+            Log.d(TAG, "📥 Loading conversations from Firebase...")
+
+            val conversationsRef = userRef.child(CONVERSATIONS_PATH)
+            val snapshot = conversationsRef.get().await()
+
+            if (!snapshot.exists()) {
+                Log.d(TAG, "No conversations found in Firebase")
+                return true
+            }
+
+            var loadedConversations = 0
+            var loadedMessages = 0
+
+            for (convoSnapshot in snapshot.children) {
+                try {
+                    // Load conversation data
+                    val convoId = decodeKey(convoSnapshot.child("convo_id").getValue(String::class.java) ?: continue)
+                    val packageName = convoSnapshot.child("package_name").getValue(String::class.java) ?: ""
+                    val displayName = convoSnapshot.child("display_name").getValue(String::class.java) ?: "Unknown"
+                    val lastMsgTime = convoSnapshot.child("last_msg_time").getValue(Long::class.java) ?: 0L
+                    val lastMsgContent = convoSnapshot.child("last_msg_content").getValue(String::class.java) ?: ""
+                    val unreadCount = convoSnapshot.child("unread_count").getValue(Int::class.java) ?: 0
+                    val platformId = convoSnapshot.child("platform_id").getValue(String::class.java)
+
+                    val conversation = NotificationMemoryStore.Conversation(
+                        convo_id = convoId,
+                        package_name = packageName,
+                        display_name = displayName,
+                        last_msg_time = lastMsgTime,
+                        last_msg_content = lastMsgContent,
+                        platform_id = platformId?.takeIf { it.isNotBlank() },
+                        unread_count = unreadCount
+                    )
+
+                    // Add to memory store
+                    NotificationMemoryStore.addConversationFromFirebase(conversation)
+                    loadedConversations++
+
+                    // Load messages for this conversation
+                    val messagesSnapshot = convoSnapshot.child(MESSAGES_PATH)
+                    for (msgSnapshot in messagesSnapshot.children) {
+                        try {
+                            val msgId = msgSnapshot.child("msg_id").getValue(String::class.java) ?: continue
+                            val msgConvoId = msgSnapshot.child("convo_id").getValue(String::class.java) ?: convoId
+                            val senderName = msgSnapshot.child("sender_name").getValue(String::class.java) ?: ""
+                            val msgContent = msgSnapshot.child("msg_content").getValue(String::class.java) ?: ""
+                            val timestamp = msgSnapshot.child("timestamp").getValue(Long::class.java) ?: 0L
+                            val isOutgoing = msgSnapshot.child("is_outgoing").getValue(Boolean::class.java) ?: false
+                            val msgHash = msgSnapshot.child("msg_hash").getValue(String::class.java) ?: msgId
+                            val hasReplyAction = msgSnapshot.child("has_reply_action").getValue(Boolean::class.java) ?: false
+                            val aiReply = msgSnapshot.child("ai_reply").getValue(String::class.java) ?: ""
+                            val isSent = msgSnapshot.child("is_sent").getValue(Boolean::class.java) ?: false
+
+                            val message = NotificationMemoryStore.Message(
+                                msg_id = msgId,
+                                convo_id = msgConvoId,
+                                sender_name = senderName,
+                                msg_content = msgContent,
+                                timestamp = timestamp,
+                                is_outgoing = isOutgoing,
+                                msg_hash = msgHash,
+                                has_reply_action = hasReplyAction,
+                                ai_reply = aiReply,
+                                is_sent = isSent
+                            )
+
+                            NotificationMemoryStore.addMessageFromFirebase(message)
+                            loadedMessages++
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error loading message: ${e.message}")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error loading conversation: ${e.message}")
+                }
+            }
+
+            Log.d(TAG, "✅ Loaded $loadedConversations conversations and $loadedMessages messages from Firebase")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error loading from Firebase: ${e.message}")
+            false
+        }
+    }
+
+    /**
      * Save a conversation to Firebase
      */
     suspend fun saveConversation(conversation: NotificationMemoryStore.Conversation): Boolean {

@@ -9,6 +9,7 @@ import com.google.firebase.auth.FirebaseAuth
 import android.util.Log
 import com.example.jawafai.managers.CloudinaryManager
 import com.example.jawafai.managers.ConnectedAppsManager
+import com.example.jawafai.managers.NotificationFirebaseManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -42,6 +43,16 @@ class JawafaiApplication : Application(), DefaultLifecycleObserver {
                     Log.d("JawafaiApp", "ConnectedAppsManager initialized")
                 } catch (e: Exception) {
                     Log.e("JawafaiApp", "Failed to initialize ConnectedAppsManager: ${e.message}")
+                }
+            }
+
+            // Load notifications from Firebase
+            applicationScope.launch {
+                try {
+                    NotificationFirebaseManager.loadFromFirebase()
+                    Log.d("JawafaiApp", "NotificationFirebaseManager loaded from Firebase")
+                } catch (e: Exception) {
+                    Log.e("JawafaiApp", "Failed to load notifications from Firebase: ${e.message}")
                 }
             }
         }
