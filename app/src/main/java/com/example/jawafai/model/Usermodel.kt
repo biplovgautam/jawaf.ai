@@ -11,6 +11,7 @@ data class UserModel(
     val imageUrl: String? = null, // For future Cloudinary integration
     val bio: String = "",
     val personaCompleted: Boolean = false, // Added for persona completion tracking
+    val isPro: Boolean = true, // Premium user flag - new users are Pro by default
     val createdAt: Long = System.currentTimeMillis()
 ) {
     // Convert to map for Firestore
@@ -25,6 +26,7 @@ data class UserModel(
             "imageUrl" to imageUrl,
             "bio" to bio,
             "personaCompleted" to personaCompleted, // Added personaCompleted to map
+            "isPro" to isPro, // Added isPro to map
             "createdAt" to createdAt
             // fcmToken removed as we are no longer using FCM
         )
@@ -43,6 +45,7 @@ data class UserModel(
                 imageUrl = map["imageUrl"] as? String,
                 bio = map["bio"] as? String ?: "",
                 personaCompleted = map["personaCompleted"] as? Boolean ?: false, // Added personaCompleted to fromMap
+                isPro = map["isPro"] as? Boolean ?: false, // Existing users without isPro field are freemium
                 createdAt = map["createdAt"] as? Long ?: System.currentTimeMillis()
                 // fcmToken removed as we are no longer using FCM
             )
