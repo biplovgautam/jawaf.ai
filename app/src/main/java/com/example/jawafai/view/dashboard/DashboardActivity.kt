@@ -17,12 +17,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.ChatBubbleOutline
 import androidx.compose.material.icons.rounded.Person
@@ -51,6 +55,7 @@ import com.example.jawafai.view.auth.LoginActivity
 import com.example.jawafai.view.dashboard.chat.ChatBotScreen
 import com.example.jawafai.view.dashboard.chat.ChatDetailScreen
 import com.example.jawafai.view.dashboard.chat.ChatScreen
+import com.example.jawafai.view.dashboard.reminder.ReminderScreen
 import com.example.jawafai.view.dashboard.home.HomeScreen
 import com.example.jawafai.view.dashboard.notifications.NotificationScreen
 import com.example.jawafai.view.dashboard.notifications.ConversationDetailScreen
@@ -132,11 +137,11 @@ sealed class BottomNavItem(
         contentDescription = "Analytics"
     )
 
-    object Chat : BottomNavItem(
-        route = "chat",
-        selectedIcon = Icons.Rounded.ChatBubble,
-        unselectedIcon = Icons.Rounded.ChatBubbleOutline,
-        contentDescription = "Chat"
+    object Reminders : BottomNavItem(
+        route = "reminders",
+        selectedIcon = Icons.Filled.Event,
+        unselectedIcon = Icons.Outlined.Event,
+        contentDescription = "Reminders"
     )
 
     object Notifications : BottomNavItem(
@@ -171,7 +176,7 @@ fun DashboardScreen(
     val items = listOf(
         BottomNavItem.Home,
         BottomNavItem.Analytics,
-        BottomNavItem.Chat,
+        BottomNavItem.Reminders,
         BottomNavItem.Notifications,
         BottomNavItem.Settings
     )
@@ -410,9 +415,9 @@ fun DashboardScreen(
                     AnalyticsScreen()
                 }
 
-                // Chat Screen (Index 2)
+                // Reminders Screen (Index 2)
                 composable(
-                    BottomNavItem.Chat.route,
+                    BottomNavItem.Reminders.route,
                     enterTransition = {
                         val initialRoute = initialState.destination.route
                         val targetIndex = 2
@@ -420,14 +425,14 @@ fun DashboardScreen(
 
                         when {
                             initialIndex < targetIndex -> {
-                                // Coming from left (Home/Analytics to Chat)
+                                // Coming from left (Home/Analytics to Reminders)
                                 slideInHorizontally(
                                     initialOffsetX = { it },
                                     animationSpec = tween(500, easing = FastOutSlowInEasing)
                                 ) + fadeIn(animationSpec = tween(500))
                             }
                             initialIndex > targetIndex -> {
-                                // Coming from right (Notifications/Settings to Chat)
+                                // Coming from right (Notifications/Settings to Reminders)
                                 slideInHorizontally(
                                     initialOffsetX = { -it },
                                     animationSpec = tween(500, easing = FastOutSlowInEasing)
@@ -445,14 +450,14 @@ fun DashboardScreen(
 
                         when {
                             targetIndex < currentIndex -> {
-                                // Going to left (Chat to Home)
+                                // Going to left (Reminders to Home)
                                 slideOutHorizontally(
                                     targetOffsetX = { it },
                                     animationSpec = tween(500, easing = FastOutSlowInEasing)
                                 ) + fadeOut(animationSpec = tween(500))
                             }
                             targetIndex > currentIndex -> {
-                                // Going to right (Chat to Notifications/Settings)
+                                // Going to right (Reminders to Notifications/Settings)
                                 slideOutHorizontally(
                                     targetOffsetX = { -it },
                                     animationSpec = tween(500, easing = FastOutSlowInEasing)
@@ -464,12 +469,7 @@ fun DashboardScreen(
                         }
                     }
                 ) {
-                    ChatScreen(
-                        onNavigateToChat = { chatId, otherUserId ->
-                            navController.navigate("chat_detail/$chatId/$otherUserId")
-                        },
-                        onNavigateToChatBot = { navController.navigate("chatbot") }
-                    )
+                    ReminderScreen()
                 }
 
                 // Notifications Screen (Index 3)
