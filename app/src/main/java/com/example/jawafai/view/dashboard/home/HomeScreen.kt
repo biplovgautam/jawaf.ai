@@ -1,5 +1,7 @@
 package com.example.jawafai.view.dashboard.home
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,6 +24,8 @@ import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material3.*
@@ -30,6 +34,8 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -46,6 +52,7 @@ import com.example.jawafai.ui.theme.AppFonts
 import com.example.jawafai.view.ui.theme.JawafAccent
 import com.example.jawafai.view.dashboard.notifications.ChatNotification
 import androidx.compose.ui.res.painterResource
+import com.example.jawafai.service.NotificationMemoryStore
 import com.example.jawafai.view.dashboard.notifications.ChatPlatform
 import com.example.jawafai.viewmodel.ChatViewModel
 import com.example.jawafai.viewmodel.ChatViewModelFactory
@@ -54,9 +61,15 @@ import com.example.jawafai.viewmodel.UserViewModelFactory
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.airbnb.lottie.compose.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.*
+
+// Theme colors
+private val JawafText = Color(0xFF191919)
+private val JawafTextSecondary = Color(0xFF666666)
+private val JawafBackground = Color(0xFFFAFAFA)
 
 // Data classes
 data class ChatPreview(
@@ -108,6 +121,11 @@ fun HomeScreen(
     val userUsername = currentUserProfile?.username
     val userFirstName = currentUserProfile?.firstName
 
+    // Check if user is PRO (you can adjust this logic based on your pro status field)
+    val isUserPro = remember(currentUserProfile) {
+        currentUserProfile?.isPro ?: false
+    }
+
     // Check persona completion status based on new questions
     var isPersonaCompleted by remember { mutableStateOf(false) }
 
@@ -144,141 +162,99 @@ fun HomeScreen(
         userViewModel.fetchUserProfile()
     }
 
-    // Get recent chats (only take first 3-4 for home screen)
-    val recentChats = remember(chatSummaries) {
-        chatSummaries.filter { it.lastMessage.isNotBlank() }.take(3)
-    }
-
-    // Observe external notifications from NotificationMemoryStore
-    val externalNotifications by remember {
-        derivedStateOf {
-            com.example.jawafai.service.NotificationMemoryStore.getAllNotifications()
-        }
-    }
-
-    // Get latest 2-3 notifications for home screen - only supported platforms
-    val latestNotifications = remember(externalNotifications) {
-        externalNotifications.filter { notification ->
-            notification.packageName.contains("whatsapp", true) ||
-            notification.packageName.contains("instagram", true) ||
-            notification.packageName.contains("messenger", true) ||
-            notification.packageName.contains("facebook.orca", true)
-        }.take(2).map { notification ->
-            ChatNotification(
-                id = notification.hash,
-                platform = when {
-                    notification.packageName.contains("whatsapp", true) -> ChatPlatform.WHATSAPP
-                    notification.packageName.contains("instagram", true) -> ChatPlatform.INSTAGRAM
-                    notification.packageName.contains("messenger", true) ||
-                    notification.packageName.contains("facebook.orca", true) -> ChatPlatform.MESSENGER
-                    else -> ChatPlatform.GENERAL
-                },
-                senderName = notification.sender?.takeIf { it.isNotBlank() } ?: notification.title.ifBlank { notification.packageName },
-                senderAvatar = null,
-                message = notification.text,
-                timestamp = notification.time,
-                isRead = false,
-                hasGeneratedReply = notification.ai_reply.isNotBlank(),
-                generatedReply = notification.ai_reply,
-                hasReplyAction = notification.hasReplyAction,
-                isSent = notification.is_sent,
-                conversationId = notification.conversationId,
-                notificationHash = notification.hash
-            )
-        }
+    // Get top 3 conversations from NotificationMemoryStore
+    val conversations = remember { NotificationMemoryStore.getAllConversations() }
+    val topConversations = remember(conversations) {
+        conversations.sortedByDescending { it.last_msg_time }.take(3)
     }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        // Disable all system window insets to take full screen
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        containerColor = Color.White,
+        containerColor = JawafBackground,
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = Color.White,
+                shadowElevation = 2.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // App Logo image - ZOOMED
+                    Image(
+                        painter = painterResource(id = R.drawable.logotext),
+                        contentDescription = "Jawaf.AI Logo",
+                        modifier = Modifier
+                            .height(36.dp)
+                            .scale(1.2f),
+                        contentScale = ContentScale.FillHeight
+                    )
+
+                    // Enhanced Username and Profile section with PRO badge
+                    Card(
+                        modifier = Modifier
+                            .clickable { onProfileClick() },
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = JawafAccent.copy(alpha = 0.1f)
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                     ) {
-                        // App Logo image
-                        Image(
-                            painter = painterResource(id = R.drawable.logotext),
-                            contentDescription = "Jawaf.AI Logo",
-                            modifier = Modifier.height(28.dp)
-                        )
-
-                        // Enhanced Username and Profile section
-                        Card(
-                            modifier = Modifier
-                                .clickable { onProfileClick() }
-                                .padding(end = 16.dp), // Increased right padding
-                            shape = RoundedCornerShape(28.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color(0xFFF0F8FF)
-                            ),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                // Username with better styling
-                                currentUserProfile?.let { profile ->
-                                    Text(
-                                        text = profile.username,
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontFamily = AppFonts.KarlaFontFamily,
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = JawafAccent
-                                        )
-                                    )
-                                }
+                            // Animated text - switches between username and PRO
+                            AnimatedUserBadge(
+                                username = userUsername ?: "User",
+                                isPro = isUserPro
+                            )
 
-                                // Enhanced Profile Picture
-                                Box(
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFFA5C9CA))
-                                        .border(2.dp, JawafAccent.copy(alpha = 0.2f), CircleShape)
-                                ) {
-                                    if (userImageUrl != null) {
-                                        AsyncImage(
-                                            model = userImageUrl,
-                                            contentDescription = "Profile Picture",
-                                            modifier = Modifier.fillMaxSize(),
-                                            contentScale = ContentScale.Crop
-                                        )
-                                    } else {
-                                        Icon(
-                                            imageVector = Icons.Default.Person,
-                                            contentDescription = "Default Profile",
-                                            modifier = Modifier.align(Alignment.Center),
-                                            tint = Color.White
-                                        )
-                                    }
+                            // Profile Picture
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(JawafAccent.copy(alpha = 0.2f))
+                                    .border(2.dp, JawafAccent, CircleShape)
+                            ) {
+                                if (userImageUrl != null) {
+                                    AsyncImage(
+                                        model = userImageUrl,
+                                        contentDescription = "Profile Picture",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Person,
+                                        contentDescription = "Default Profile",
+                                        modifier = Modifier
+                                            .align(Alignment.Center)
+                                            .size(18.dp),
+                                        tint = JawafAccent
+                                    )
                                 }
                             }
                         }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
-                ),
-                modifier = Modifier.statusBarsPadding()
-            )
+                }
+            }
         }
     ) { paddingValues ->
-        // Use padding values only for the top bar, handle bottom manually
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.White)
+                .background(JawafBackground)
                 .padding(top = paddingValues.calculateTopPadding())
-                .padding(bottom = 36.dp) // Add bottom padding for navigation bar
+                .padding(bottom = 36.dp)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
@@ -286,48 +262,135 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            // Hero Section - Enhanced App Purpose
+            // Hero Section
             item {
                 HeroSection(userFirstName = userFirstName ?: "User")
             }
 
-            // Complete Persona Section (Always visible with completion indicator)
-            item {
-                CompletePersonaSection(
-                    onCompletePersonaClick = onCompletePersonaClick,
-                    isPersonaCompleted = isPersonaCompleted
-                )
+            // Complete Persona Section - ONLY show if NOT completed
+            if (!isPersonaCompleted) {
+                item {
+                    CompletePersonaSection(
+                        onCompletePersonaClick = onCompletePersonaClick,
+                        isPersonaCompleted = isPersonaCompleted
+                    )
+                }
             }
 
-            // Chat Bot Section with enhanced design
+            // Chat Bot Section
             item {
                 ChatBotSection(onChatBotClick = onChatBotClick)
             }
 
-            // Smart Notifications Section (Latest 2-3 notifications)
+            // Messages Section (renamed from Smart Notifications, shows top 3 conversations)
             item {
-                SmartNotificationsSection(
-                    notifications = latestNotifications,
-                    onNotificationClick = onNotificationClick,
+                MessagesSection(
+                    conversations = topConversations,
+                    onMessageClick = onNotificationClick,
                     onSeeAllClick = onNotificationClick
                 )
             }
 
-            // Recent Chats Section
-            item {
-                RecentChatsSection(
-                    chats = recentChats,
-                    onChatClick = onRecentChatClick,
-                    onSeeAllClick = onSeeAllChatsClick
-                )
-            }
-
-            // Add bottom padding for navigation bar
+            // Bottom padding
             item {
                 Spacer(modifier = Modifier.navigationBarsPadding())
                 Spacer(modifier = Modifier.height(20.dp))
             }
         }
+    }
+}
+
+/**
+ * Animated badge that switches between username and PRO label
+ */
+@Composable
+fun AnimatedUserBadge(
+    username: String,
+    isPro: Boolean
+) {
+    if (isPro) {
+        // Animated switching between name and PRO
+        var showPro by remember { mutableStateOf(false) }
+
+        LaunchedEffect(Unit) {
+            while (true) {
+                delay(3000) // Show name for 3 seconds
+                showPro = true
+                delay(2000) // Show PRO for 2 seconds
+                showPro = false
+            }
+        }
+
+        Box(
+            modifier = Modifier.width(80.dp),
+            contentAlignment = Alignment.CenterEnd
+        ) {
+            AnimatedContent(
+                targetState = showPro,
+                transitionSpec = {
+                    (fadeIn(animationSpec = tween(500)) + slideInHorizontally(
+                        animationSpec = tween(500),
+                        initialOffsetX = { -it }
+                    )).togetherWith(
+                        fadeOut(animationSpec = tween(500)) + slideOutHorizontally(
+                            animationSpec = tween(500),
+                            targetOffsetX = { it }
+                        )
+                    )
+                },
+                label = "pro_badge_animation"
+            ) { targetShowPro ->
+                if (targetShowPro) {
+                    // PRO badge
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = "Pro",
+                            modifier = Modifier.size(14.dp),
+                            tint = Color(0xFFFFD700)
+                        )
+                        Text(
+                            text = "PRO",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontFamily = AppFonts.KarlaFontFamily,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFFD700)
+                            )
+                        )
+                    }
+                } else {
+                    // Username
+                    Text(
+                        text = username,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = AppFonts.KarlaFontFamily,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = JawafText
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    } else {
+        // Just show username for non-pro users
+        Text(
+            text = username,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontFamily = AppFonts.KarlaFontFamily,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = JawafText
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 @Composable
@@ -503,6 +566,240 @@ fun ChatBotSection(onChatBotClick: () -> Unit) {
                     progress = { progress },
                     modifier = Modifier.size(100.dp)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun MessagesSection(
+    conversations: List<NotificationMemoryStore.Conversation>,
+    onMessageClick: () -> Unit,
+    onSeeAllClick: () -> Unit
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Messages",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontFamily = AppFonts.KarlaFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = JawafText
+                )
+            )
+            TextButton(
+                onClick = onSeeAllClick
+            ) {
+                Text(
+                    text = "See All",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = AppFonts.KarlaFontFamily,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = JawafAccent
+                    )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        if (conversations.isEmpty()) {
+            // Empty state
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(JawafAccent.copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Forum,
+                            contentDescription = "No messages",
+                            modifier = Modifier.size(32.dp),
+                            tint = JawafAccent
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "No messages yet",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = AppFonts.KarlaFontFamily,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 15.sp,
+                            color = JawafText
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Messages from connected apps will appear here",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = AppFonts.KaiseiDecolFontFamily,
+                            fontSize = 12.sp,
+                            color = JawafTextSecondary
+                        )
+                    )
+                }
+            }
+        } else {
+            // Show top 3 conversations
+            conversations.forEach { conversation ->
+                HomeConversationItem(
+                    conversation = conversation,
+                    onClick = onMessageClick
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun HomeConversationItem(
+    conversation: NotificationMemoryStore.Conversation,
+    onClick: () -> Unit
+) {
+    val platform = when {
+        conversation.package_name.contains("whatsapp", true) -> ChatPlatform.WHATSAPP
+        conversation.package_name.contains("instagram", true) -> ChatPlatform.INSTAGRAM
+        conversation.package_name.contains("messenger", true) ||
+        conversation.package_name.contains("facebook.orca", true) -> ChatPlatform.MESSENGER
+        else -> ChatPlatform.GENERAL
+    }
+
+    val hasUnread = conversation.unread_count > 0
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (hasUnread) Color.White else Color(0xFFFAFAFA)
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (hasUnread) 4.dp else 1.dp
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Avatar with platform color
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(platform.color.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = conversation.display_name.take(2).uppercase(),
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontFamily = AppFonts.KarlaFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = platform.color
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Content
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = conversation.display_name,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontFamily = AppFonts.KarlaFontFamily,
+                            fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 15.sp,
+                            color = JawafText
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    // Platform tag
+                    Text(
+                        text = platform.displayName,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = AppFonts.KaiseiDecolFontFamily,
+                            fontSize = 10.sp,
+                            color = platform.color
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = conversation.last_msg_content,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = AppFonts.KaiseiDecolFontFamily,
+                            fontSize = 13.sp,
+                            color = JawafTextSecondary
+                        ),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    // Unread badge
+                    if (hasUnread) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clip(CircleShape)
+                                .background(JawafAccent),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (conversation.unread_count > 9) "9+"
+                                       else conversation.unread_count.toString(),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontFamily = AppFonts.KarlaFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 9.sp,
+                                    color = Color.White
+                                )
+                            )
+                        }
+                    }
+                }
             }
         }
     }

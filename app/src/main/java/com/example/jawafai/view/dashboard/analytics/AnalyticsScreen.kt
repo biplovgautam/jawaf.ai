@@ -547,6 +547,13 @@ fun CommunicationHealthCard(
         else -> Color(0xFFFF5722)
     }
 
+    // Auto-generate insight when card is first displayed
+    LaunchedEffect(Unit) {
+        if (aiInsight == null && !isLoadingInsight) {
+            onRefreshInsight()
+        }
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
@@ -640,117 +647,60 @@ fun CommunicationHealthCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Generate Insight Button
-            if (aiInsight == null && !isLoadingInsight) {
-                OutlinedButton(
-                    onClick = onRefreshInsight,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = JawafAccent
-                    ),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, JawafAccent)
+            // AI Insight Card - always show, auto-generates
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.White.copy(alpha = 0.1f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.Top
                 ) {
                     Icon(
                         imageVector = Icons.Filled.AutoAwesome,
                         contentDescription = null,
+                        tint = JawafAccent,
                         modifier = Modifier.size(18.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Generate AI Insight",
-                        fontFamily = AppFonts.KarlaFontFamily,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 14.sp
-                    )
-                }
-            } else {
-                // AI Insight Card
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color.White.copy(alpha = 0.1f)
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    if (isLoadingInsight) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.Top
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.AutoAwesome,
-                                contentDescription = null,
-                                tint = JawafAccent,
-                                modifier = Modifier.size(18.dp)
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                color = JawafAccent,
+                                strokeWidth = 2.dp
                             )
-                            Spacer(modifier = Modifier.width(10.dp))
-
-                            if (isLoadingInsight) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(14.dp),
-                                        color = JawafAccent,
-                                        strokeWidth = 2.dp
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Analyzing...",
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            fontFamily = AppFonts.KaiseiDecolFontFamily,
-                                            fontSize = 12.sp,
-                                            color = Color.White.copy(alpha = 0.8f)
-                                        )
-                                    )
-                                }
-                            } else {
-                                Text(
-                                    text = aiInsight ?: "",
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        fontFamily = AppFonts.KaiseiDecolFontFamily,
-                                        fontSize = 12.sp,
-                                        color = Color.White,
-                                        lineHeight = 18.sp
-                                    ),
-                                    modifier = Modifier.weight(1f),
-                                    maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Analyzing...",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = AppFonts.KaiseiDecolFontFamily,
+                                    fontSize = 12.sp,
+                                    color = Color.White.copy(alpha = 0.8f)
                                 )
-                            }
+                            )
                         }
-
-                        // Regenerate button
-                        if (!isLoadingInsight && aiInsight != null) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End
-                            ) {
-                                TextButton(
-                                    onClick = onRefreshInsight,
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Refresh,
-                                        contentDescription = null,
-                                        tint = JawafAccent,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "Refresh",
-                                        color = JawafAccent,
-                                        fontSize = 11.sp,
-                                        fontFamily = AppFonts.KarlaFontFamily
-                                    )
-                                }
-                            }
-                        }
+                    } else {
+                        Text(
+                            text = aiInsight ?: "Tap to generate insight",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = AppFonts.KaiseiDecolFontFamily,
+                                fontSize = 12.sp,
+                                color = Color.White,
+                                lineHeight = 18.sp
+                            ),
+                            modifier = Modifier.weight(1f),
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
             }
