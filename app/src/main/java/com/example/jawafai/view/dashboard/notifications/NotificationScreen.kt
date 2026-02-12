@@ -420,23 +420,25 @@ fun NotificationScreen(
             when (selectedTab) {
                 0 -> {
                     // Smart Tab (conversation-based view)
-                    SmartNotificationsContent(
-                        conversations = conversations,
-                        selectedConversation = selectedConversation,
-                        onConversationClick = { convoId ->
-                            selectedConversation = convoId
-                            NotificationMemoryStore.markConversationAsRead(convoId)
-                        },
-                        onBackToInbox = { selectedConversation = null },
-                        selectedFilter = selectedFilter,
-                        onFilterChange = { selectedFilter = it },
-                        isRefreshing = isRefreshing,
-                        generatingReplyFor = generatingReplyFor,
-                        sendingStatus = sendingStatus,
-                        sendingMessages = sendingMessages,
-                        onGenerateReply = { notificationHash -> generateAIReply(notificationHash) },
-                        onSendReply = { conversationId, replyText -> sendReply(conversationId, replyText) }
-                    )
+                    if (selectedConversation != null) {
+                        // Show full conversation screen
+                        ConversationDetailScreen(
+                            conversationId = selectedConversation!!,
+                            onBackClick = { selectedConversation = null }
+                        )
+                    } else {
+                        // Show inbox
+                        ConversationInboxView(
+                            conversations = conversations,
+                            selectedFilter = selectedFilter,
+                            onFilterChange = { selectedFilter = it },
+                            isRefreshing = isRefreshing,
+                            onConversationClick = { convoId ->
+                                selectedConversation = convoId
+                                NotificationMemoryStore.markConversationAsRead(convoId)
+                            }
+                        )
+                    }
                 }
                 1 -> {
                     // Raw Tab (new functionality)
