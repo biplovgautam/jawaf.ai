@@ -19,11 +19,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Message
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.BarChart
@@ -146,9 +148,9 @@ sealed class BottomNavItem(
 
     object Notifications : BottomNavItem(
         route = "notifications",
-        selectedIcon = Icons.Filled.Notifications,
-        unselectedIcon = Icons.Outlined.Notifications,
-        contentDescription = "Notifications"
+        selectedIcon = Icons.Filled.Message,
+        unselectedIcon = Icons.Outlined.Message,
+        contentDescription = "Messages"
     )
 
     object Settings : BottomNavItem(
@@ -176,8 +178,8 @@ fun DashboardScreen(
     val items = listOf(
         BottomNavItem.Home,
         BottomNavItem.Analytics,
-        BottomNavItem.Reminders,
         BottomNavItem.Notifications,
+        BottomNavItem.Reminders,
         BottomNavItem.Settings
     )
 
@@ -235,8 +237,8 @@ fun DashboardScreen(
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar(
-                    containerColor = Color(0xFFE7F6F2),
-                    contentColor = Color(0xFF395B64),
+                    containerColor = Color.White,
+                    contentColor = Color(0xFF191919),
                     modifier = Modifier
                         .fillMaxWidth()
                         // Remove the bottom padding to attach directly to bottom
@@ -262,7 +264,7 @@ fun DashboardScreen(
                                                 .width(16.dp)
                                                 .height(2.dp)
                                                 .clip(CircleShape)
-                                                .background(Color(0xFF395B64))
+                                                .background(Color(0xFF1BC994))
                                         )
                                     }
                                 }
@@ -274,8 +276,8 @@ fun DashboardScreen(
                                 }
                             },
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color(0xFF395B64),
-                                unselectedIconColor = Color(0xFF666666),
+                                selectedIconColor = Color(0xFF1BC994),
+                                unselectedIconColor = Color(0xFF999999),
                                 indicatorColor = Color.Transparent
                             ),
                             alwaysShowLabel = false
@@ -415,9 +417,9 @@ fun DashboardScreen(
                     AnalyticsScreen()
                 }
 
-                // Reminders Screen (Index 2)
+                // Notifications/Messages Screen (Index 2)
                 composable(
-                    BottomNavItem.Reminders.route,
+                    BottomNavItem.Notifications.route,
                     enterTransition = {
                         val initialRoute = initialState.destination.route
                         val targetIndex = 2
@@ -425,14 +427,14 @@ fun DashboardScreen(
 
                         when {
                             initialIndex < targetIndex -> {
-                                // Coming from left (Home/Analytics to Reminders)
+                                // Coming from left (Home/Analytics to Messages)
                                 slideInHorizontally(
                                     initialOffsetX = { it },
                                     animationSpec = tween(500, easing = FastOutSlowInEasing)
                                 ) + fadeIn(animationSpec = tween(500))
                             }
                             initialIndex > targetIndex -> {
-                                // Coming from right (Notifications/Settings to Reminders)
+                                // Coming from right (Reminders/Settings to Messages)
                                 slideInHorizontally(
                                     initialOffsetX = { -it },
                                     animationSpec = tween(500, easing = FastOutSlowInEasing)
@@ -450,71 +452,14 @@ fun DashboardScreen(
 
                         when {
                             targetIndex < currentIndex -> {
-                                // Going to left (Reminders to Home)
+                                // Going to left (Messages to Home/Analytics)
                                 slideOutHorizontally(
                                     targetOffsetX = { it },
                                     animationSpec = tween(500, easing = FastOutSlowInEasing)
                                 ) + fadeOut(animationSpec = tween(500))
                             }
                             targetIndex > currentIndex -> {
-                                // Going to right (Reminders to Notifications/Settings)
-                                slideOutHorizontally(
-                                    targetOffsetX = { -it },
-                                    animationSpec = tween(500, easing = FastOutSlowInEasing)
-                                ) + fadeOut(animationSpec = tween(500))
-                            }
-                            else -> {
-                                fadeOut(animationSpec = tween(500))
-                            }
-                        }
-                    }
-                ) {
-                    ReminderScreen()
-                }
-
-                // Notifications Screen (Index 3)
-                composable(
-                    BottomNavItem.Notifications.route,
-                    enterTransition = {
-                        val initialRoute = initialState.destination.route
-                        val targetIndex = 3
-                        val initialIndex = items.indexOfFirst { it.route == initialRoute }
-
-                        when {
-                            initialIndex < targetIndex -> {
-                                // Coming from left (Home/Analytics/Chat to Notifications)
-                                slideInHorizontally(
-                                    initialOffsetX = { it },
-                                    animationSpec = tween(500, easing = FastOutSlowInEasing)
-                                ) + fadeIn(animationSpec = tween(500))
-                            }
-                            initialIndex > targetIndex -> {
-                                // Coming from right (Settings to Notifications)
-                                slideInHorizontally(
-                                    initialOffsetX = { -it },
-                                    animationSpec = tween(500, easing = FastOutSlowInEasing)
-                                ) + fadeIn(animationSpec = tween(500))
-                            }
-                            else -> {
-                                fadeIn(animationSpec = tween(500))
-                            }
-                        }
-                    },
-                    exitTransition = {
-                        val targetRoute = targetState.destination.route
-                        val currentIndex = 3
-                        val targetIndex = items.indexOfFirst { it.route == targetRoute }
-
-                        when {
-                            targetIndex < currentIndex -> {
-                                // Going to left (Notifications to Home/Analytics/Chat)
-                                slideOutHorizontally(
-                                    targetOffsetX = { it },
-                                    animationSpec = tween(500, easing = FastOutSlowInEasing)
-                                ) + fadeOut(animationSpec = tween(500))
-                            }
-                            targetIndex > currentIndex -> {
-                                // Going to right (Notifications to Settings)
+                                // Going to right (Messages to Reminders/Settings)
                                 slideOutHorizontally(
                                     targetOffsetX = { -it },
                                     animationSpec = tween(500, easing = FastOutSlowInEasing)
@@ -534,6 +479,63 @@ fun DashboardScreen(
                             navController.navigate("conversation_detail/$conversationId")
                         }
                     )
+                }
+
+                // Reminders Screen (Index 3)
+                composable(
+                    BottomNavItem.Reminders.route,
+                    enterTransition = {
+                        val initialRoute = initialState.destination.route
+                        val targetIndex = 3
+                        val initialIndex = items.indexOfFirst { it.route == initialRoute }
+
+                        when {
+                            initialIndex < targetIndex -> {
+                                // Coming from left (Home/Analytics/Messages to Reminders)
+                                slideInHorizontally(
+                                    initialOffsetX = { it },
+                                    animationSpec = tween(500, easing = FastOutSlowInEasing)
+                                ) + fadeIn(animationSpec = tween(500))
+                            }
+                            initialIndex > targetIndex -> {
+                                // Coming from right (Settings to Reminders)
+                                slideInHorizontally(
+                                    initialOffsetX = { -it },
+                                    animationSpec = tween(500, easing = FastOutSlowInEasing)
+                                ) + fadeIn(animationSpec = tween(500))
+                            }
+                            else -> {
+                                fadeIn(animationSpec = tween(500))
+                            }
+                        }
+                    },
+                    exitTransition = {
+                        val targetRoute = targetState.destination.route
+                        val currentIndex = 3
+                        val targetIndex = items.indexOfFirst { it.route == targetRoute }
+
+                        when {
+                            targetIndex < currentIndex -> {
+                                // Going to left (Reminders to Home/Analytics/Messages)
+                                slideOutHorizontally(
+                                    targetOffsetX = { it },
+                                    animationSpec = tween(500, easing = FastOutSlowInEasing)
+                                ) + fadeOut(animationSpec = tween(500))
+                            }
+                            targetIndex > currentIndex -> {
+                                // Going to right (Reminders to Settings)
+                                slideOutHorizontally(
+                                    targetOffsetX = { -it },
+                                    animationSpec = tween(500, easing = FastOutSlowInEasing)
+                                ) + fadeOut(animationSpec = tween(500))
+                            }
+                            else -> {
+                                fadeOut(animationSpec = tween(500))
+                            }
+                        }
+                    }
+                ) {
+                    ReminderScreen()
                 }
 
                 // Conversation Detail Screen (Full screen without bottom bar)
