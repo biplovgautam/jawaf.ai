@@ -58,7 +58,8 @@ import java.util.*
 @Composable
 fun ConversationDetailScreen(
     conversationId: String,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onNavigateToPersona: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -137,12 +138,55 @@ fun ConversationDetailScreen(
         }
     }
 
+    // Check if user persona is completed (needs at least 8 answers)
+    suspend fun isPersonaCompleted(): Boolean {
+        return try {
+            val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+                ?: return false
+
+            val personaRef = FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(currentUserId)
+                .collection("persona")
+
+            val personaData = personaRef.get().await()
+
+            var validAnswers = 0
+            personaData.documents.forEach { document ->
+                document.getString("answer")?.let { answer ->
+                    if (answer.isNotBlank()) {
+                        validAnswers++
+                    }
+                }
+            }
+
+            validAnswers >= 8
+        } catch (e: Exception) {
+            Log.e("ConversationDetail", "Failed to check persona: ${e.message}")
+            false
+        }
+    }
+
     // Generate AI Reply function with conversation context and user persona
     fun generateAIReply(message: NotificationMemoryStore.Message) {
         coroutineScope.launch {
             try {
                 isGeneratingReply = true
                 generatingForHash = message.msg_hash
+
+                // Check if persona is completed first
+                val personaComplete = isPersonaCompleted()
+                if (!personaComplete) {
+                    isGeneratingReply = false
+                    generatingForHash = null
+                    Toast.makeText(
+                        context,
+                        "Please complete your persona to use AI replies",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    onNavigateToPersona()
+                    return@launch
+                }
 
                 // Find the original notification
                 val notification = NotificationMemoryStore.getAllNotifications()
@@ -382,7 +426,8 @@ fun ConversationDetailScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                        .padding(horizontal = 12.dp, vertical = 12.dp)
+                        .padding(bottom = 56.dp), // Extra padding for bottom nav bar
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Text input
@@ -401,13 +446,17 @@ fun ConversationDetailScreen(
                         },
                         textStyle = MaterialTheme.typography.bodyMedium.copy(
                             fontFamily = AppFonts.KaiseiDecolFontFamily,
-                            fontSize = 16.sp
+                            fontSize = 16.sp,
+                            color = Color(0xFF191919) // Dark themed text color
                         ),
                         colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color(0xFF191919),
+                            unfocusedTextColor = Color(0xFF191919),
                             focusedBorderColor = Color(0xFF1BC994),
                             unfocusedBorderColor = Color(0xFFE0E0E0),
                             focusedContainerColor = Color(0xFFF8F8F8),
-                            unfocusedContainerColor = Color(0xFFF8F8F8)
+                            unfocusedContainerColor = Color(0xFFF8F8F8),
+                            cursorColor = Color(0xFF1BC994)
                         ),
                         shape = RoundedCornerShape(24.dp),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
@@ -498,7 +547,12 @@ fun ConversationDetailScreen(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = 16.dp,
+                        bottom = 80.dp // Extra padding to prevent content hiding behind bottom bar
+                    ),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(messages) { message ->
@@ -514,9 +568,9 @@ fun ConversationDetailScreen(
                         )
                     }
 
-                    // Add some space at the bottom
+                    // Add some space at the bottom for scrolling
                     item {
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
                 }
             }

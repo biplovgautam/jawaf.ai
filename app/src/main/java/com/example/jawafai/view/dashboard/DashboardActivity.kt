@@ -572,6 +572,11 @@ fun DashboardScreen(
                         conversationId = conversationId,
                         onBackClick = {
                             navController.popBackStack()
+                        },
+                        onNavigateToPersona = {
+                            navController.navigate("settings/persona") {
+                                launchSingleTop = true
+                            }
                         }
                     )
                 }
