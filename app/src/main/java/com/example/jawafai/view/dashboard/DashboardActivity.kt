@@ -56,8 +56,11 @@ import com.example.jawafai.view.dashboard.notifications.NotificationScreen
 import com.example.jawafai.view.dashboard.settings.PersonaScreen
 import com.example.jawafai.view.dashboard.settings.ProfileScreen
 import com.example.jawafai.view.dashboard.settings.SettingsScreen
+import com.example.jawafai.view.dashboard.analytics.AnalyticsScreen
 import com.example.jawafai.utils.WithNetworkMonitoring
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.outlined.BarChart
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.appcompat.app.AlertDialog
@@ -121,6 +124,13 @@ sealed class BottomNavItem(
         contentDescription = "Home"
     )
 
+    object Analytics : BottomNavItem(
+        route = "analytics",
+        selectedIcon = Icons.Filled.BarChart,
+        unselectedIcon = Icons.Outlined.BarChart,
+        contentDescription = "Analytics"
+    )
+
     object Chat : BottomNavItem(
         route = "chat",
         selectedIcon = Icons.Rounded.ChatBubble,
@@ -159,6 +169,7 @@ fun DashboardScreen(
     val navController = rememberNavController()
     val items = listOf(
         BottomNavItem.Home,
+        BottomNavItem.Analytics,
         BottomNavItem.Chat,
         BottomNavItem.Notifications,
         BottomNavItem.Settings
@@ -337,17 +348,17 @@ fun DashboardScreen(
                         },
                         onNotificationClick = {
                             // Navigate to notifications tab instead of using navigate()
-                            navigateToTab(2) // Notifications is at index 2
+                            navigateToTab(3) // Notifications is at index 3 (Home=0, Analytics=1, Chat=2, Notifications=3)
                         },
                         onSeeAllChatsClick = {
-                            navigateToTab(1) // Chat is at index 1
+                            navigateToTab(2) // Chat is at index 2
                         }
                     )
                 }
 
-                // Chat Screen (Index 1)
+                // Analytics Screen (Index 1)
                 composable(
-                    BottomNavItem.Chat.route,
+                    BottomNavItem.Analytics.route,
                     enterTransition = {
                         val initialRoute = initialState.destination.route
                         val targetIndex = 1
@@ -355,7 +366,60 @@ fun DashboardScreen(
 
                         when {
                             initialIndex < targetIndex -> {
-                                // Coming from left (Home to Chat)
+                                slideInHorizontally(
+                                    initialOffsetX = { it },
+                                    animationSpec = tween(500, easing = FastOutSlowInEasing)
+                                ) + fadeIn(animationSpec = tween(500))
+                            }
+                            initialIndex > targetIndex -> {
+                                slideInHorizontally(
+                                    initialOffsetX = { -it },
+                                    animationSpec = tween(500, easing = FastOutSlowInEasing)
+                                ) + fadeIn(animationSpec = tween(500))
+                            }
+                            else -> {
+                                fadeIn(animationSpec = tween(500))
+                            }
+                        }
+                    },
+                    exitTransition = {
+                        val targetRoute = targetState.destination.route
+                        val currentIndex = 1
+                        val targetIndex = items.indexOfFirst { it.route == targetRoute }
+
+                        when {
+                            targetIndex < currentIndex -> {
+                                slideOutHorizontally(
+                                    targetOffsetX = { it },
+                                    animationSpec = tween(500, easing = FastOutSlowInEasing)
+                                ) + fadeOut(animationSpec = tween(500))
+                            }
+                            targetIndex > currentIndex -> {
+                                slideOutHorizontally(
+                                    targetOffsetX = { -it },
+                                    animationSpec = tween(500, easing = FastOutSlowInEasing)
+                                ) + fadeOut(animationSpec = tween(500))
+                            }
+                            else -> {
+                                fadeOut(animationSpec = tween(500))
+                            }
+                        }
+                    }
+                ) {
+                    AnalyticsScreen()
+                }
+
+                // Chat Screen (Index 2)
+                composable(
+                    BottomNavItem.Chat.route,
+                    enterTransition = {
+                        val initialRoute = initialState.destination.route
+                        val targetIndex = 2
+                        val initialIndex = items.indexOfFirst { it.route == initialRoute }
+
+                        when {
+                            initialIndex < targetIndex -> {
+                                // Coming from left (Home/Analytics to Chat)
                                 slideInHorizontally(
                                     initialOffsetX = { it },
                                     animationSpec = tween(500, easing = FastOutSlowInEasing)
@@ -375,7 +439,7 @@ fun DashboardScreen(
                     },
                     exitTransition = {
                         val targetRoute = targetState.destination.route
-                        val currentIndex = 1
+                        val currentIndex = 2
                         val targetIndex = items.indexOfFirst { it.route == targetRoute }
 
                         when {
@@ -407,17 +471,17 @@ fun DashboardScreen(
                     )
                 }
 
-                // Notifications Screen (Index 2)
+                // Notifications Screen (Index 3)
                 composable(
                     BottomNavItem.Notifications.route,
                     enterTransition = {
                         val initialRoute = initialState.destination.route
-                        val targetIndex = 2
+                        val targetIndex = 3
                         val initialIndex = items.indexOfFirst { it.route == initialRoute }
 
                         when {
                             initialIndex < targetIndex -> {
-                                // Coming from left (Home/Chat to Notifications)
+                                // Coming from left (Home/Analytics/Chat to Notifications)
                                 slideInHorizontally(
                                     initialOffsetX = { it },
                                     animationSpec = tween(500, easing = FastOutSlowInEasing)
@@ -437,12 +501,12 @@ fun DashboardScreen(
                     },
                     exitTransition = {
                         val targetRoute = targetState.destination.route
-                        val currentIndex = 2
+                        val currentIndex = 3
                         val targetIndex = items.indexOfFirst { it.route == targetRoute }
 
                         when {
                             targetIndex < currentIndex -> {
-                                // Going to left (Notifications to Home/Chat)
+                                // Going to left (Notifications to Home/Analytics/Chat)
                                 slideOutHorizontally(
                                     targetOffsetX = { it },
                                     animationSpec = tween(500, easing = FastOutSlowInEasing)
@@ -468,17 +532,17 @@ fun DashboardScreen(
                     )
                 }
 
-                // Settings Screen (Index 3 - Rightmost)
+                // Settings Screen (Index 4 - Rightmost)
                 composable(
                     BottomNavItem.Settings.route,
                     enterTransition = {
                         val initialRoute = initialState.destination.route
-                        val targetIndex = 3
+                        val targetIndex = 4
                         val initialIndex = items.indexOfFirst { it.route == initialRoute }
 
                         when {
                             initialIndex < targetIndex -> {
-                                // Coming from left (Home/Chat/Notifications to Settings)
+                                // Coming from left (Home/Analytics/Chat/Notifications to Settings)
                                 slideInHorizontally(
                                     initialOffsetX = { it },
                                     animationSpec = tween(500, easing = FastOutSlowInEasing)
@@ -495,7 +559,7 @@ fun DashboardScreen(
                     },
                     exitTransition = {
                         val targetRoute = targetState.destination.route
-                        val currentIndex = 3
+                        val currentIndex = 4
                         val targetIndex = items.indexOfFirst { it.route == targetRoute }
 
                         when {
