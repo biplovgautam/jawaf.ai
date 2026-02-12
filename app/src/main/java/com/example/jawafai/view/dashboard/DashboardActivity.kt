@@ -53,6 +53,7 @@ import com.example.jawafai.view.dashboard.chat.ChatDetailScreen
 import com.example.jawafai.view.dashboard.chat.ChatScreen
 import com.example.jawafai.view.dashboard.home.HomeScreen
 import com.example.jawafai.view.dashboard.notifications.NotificationScreen
+import com.example.jawafai.view.dashboard.notifications.ConversationDetailScreen
 import com.example.jawafai.view.dashboard.settings.PersonaScreen
 import com.example.jawafai.view.dashboard.settings.ProfileScreen
 import com.example.jawafai.view.dashboard.settings.SettingsScreen
@@ -463,6 +464,49 @@ fun DashboardScreen(
                 ) {
                     NotificationScreen(
                         onNavigateBack = {
+                            navController.popBackStack()
+                        },
+                        onNavigateToConversation = { conversationId ->
+                            navController.navigate("conversation_detail/$conversationId")
+                        }
+                    )
+                }
+
+                // Conversation Detail Screen (Full screen without bottom bar)
+                composable(
+                    route = "conversation_detail/{conversationId}",
+                    arguments = listOf(
+                        navArgument("conversationId") { type = NavType.StringType }
+                    ),
+                    enterTransition = {
+                        slideInHorizontally(
+                            initialOffsetX = { it },
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        ) + fadeIn(animationSpec = tween(300))
+                    },
+                    exitTransition = {
+                        slideOutHorizontally(
+                            targetOffsetX = { it },
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        ) + fadeOut(animationSpec = tween(300))
+                    },
+                    popEnterTransition = {
+                        slideInHorizontally(
+                            initialOffsetX = { -it },
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        ) + fadeIn(animationSpec = tween(300))
+                    },
+                    popExitTransition = {
+                        slideOutHorizontally(
+                            targetOffsetX = { it },
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        ) + fadeOut(animationSpec = tween(300))
+                    }
+                ) { backStackEntry ->
+                    val conversationId = backStackEntry.arguments?.getString("conversationId") ?: ""
+                    ConversationDetailScreen(
+                        conversationId = conversationId,
+                        onBackClick = {
                             navController.popBackStack()
                         }
                     )

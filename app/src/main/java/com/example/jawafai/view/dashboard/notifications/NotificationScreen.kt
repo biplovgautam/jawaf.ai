@@ -86,7 +86,8 @@ enum class ChatPlatform(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotificationScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToConversation: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -157,9 +158,6 @@ fun NotificationScreen(
             NotificationMemoryStore.getAllConversations()
         }
     }
-
-    // State for selected conversation (null = showing inbox)
-    var selectedConversation by remember { mutableStateOf<String?>(null) }
 
     // Map external notifications to ChatNotification for display (kept for compatibility)
     val liveNotifications = remember(externalNotifications) {
@@ -419,26 +417,18 @@ fun NotificationScreen(
             // Conditional rendering based on selected tab
             when (selectedTab) {
                 0 -> {
-                    // Smart Tab (conversation-based view)
-                    if (selectedConversation != null) {
-                        // Show full conversation screen
-                        ConversationDetailScreen(
-                            conversationId = selectedConversation!!,
-                            onBackClick = { selectedConversation = null }
-                        )
-                    } else {
-                        // Show inbox
-                        ConversationInboxView(
-                            conversations = conversations,
-                            selectedFilter = selectedFilter,
-                            onFilterChange = { selectedFilter = it },
-                            isRefreshing = isRefreshing,
-                            onConversationClick = { convoId ->
-                                selectedConversation = convoId
-                                NotificationMemoryStore.markConversationAsRead(convoId)
-                            }
-                        )
-                    }
+                    // Smart Tab (conversation-based inbox view)
+                    // Clicking a conversation navigates to full screen conversation detail
+                    ConversationInboxView(
+                        conversations = conversations,
+                        selectedFilter = selectedFilter,
+                        onFilterChange = { selectedFilter = it },
+                        isRefreshing = isRefreshing,
+                        onConversationClick = { convoId ->
+                            NotificationMemoryStore.markConversationAsRead(convoId)
+                            onNavigateToConversation(convoId)
+                        }
+                    )
                 }
                 1 -> {
                     // Raw Tab (new functionality)
