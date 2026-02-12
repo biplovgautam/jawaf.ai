@@ -34,6 +34,9 @@ import com.example.jawafai.service.NotificationAIReplyManager
 import com.example.jawafai.service.NotificationMemoryStore
 import com.example.jawafai.service.RemoteReplyService
 import com.example.jawafai.ui.theme.AppFonts
+import com.example.jawafai.view.ui.theme.JawafAccent
+import com.example.jawafai.view.ui.theme.JawafText
+import com.example.jawafai.managers.NotificationFirebaseManager
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -202,11 +205,11 @@ fun ConversationDetailScreen(
 
     Scaffold(
         topBar = {
-            // Conversation Header
+            // Conversation Header - Clean white design
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = Color(0xFF395B64),
-                shadowElevation = 4.dp
+                color = Color.White,
+                shadowElevation = 2.dp
             ) {
                 Row(
                     modifier = Modifier
@@ -220,7 +223,7 @@ fun ConversationDetailScreen(
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Back",
-                            tint = Color.White
+                            tint = Color(0xFF191919)
                         )
                     }
 
@@ -229,7 +232,7 @@ fun ConversationDetailScreen(
                         modifier = Modifier
                             .size(44.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFFA5C9CA)),
+                            .background(Color(0xFF1BC994).copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -237,7 +240,7 @@ fun ConversationDetailScreen(
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontFamily = AppFonts.KarlaFontFamily,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = Color(0xFF1BC994)
                             )
                         )
                     }
@@ -252,7 +255,7 @@ fun ConversationDetailScreen(
                                 fontFamily = AppFonts.KarlaFontFamily,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 18.sp,
-                                color = Color.White
+                                color = Color(0xFF191919)
                             ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -271,7 +274,7 @@ fun ConversationDetailScreen(
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     fontFamily = AppFonts.KaiseiDecolFontFamily,
                                     fontSize = 12.sp,
-                                    color = Color.White.copy(alpha = 0.8f)
+                                    color = Color(0xFF666666)
                                 )
                             )
                         }
@@ -290,7 +293,7 @@ fun ConversationDetailScreen(
                         if (isGeneratingReply) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(20.dp),
-                                color = Color.White,
+                                color = Color(0xFF1BC994),
                                 strokeWidth = 2.dp
                             )
                         } else {

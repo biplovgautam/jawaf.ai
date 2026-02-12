@@ -324,6 +324,13 @@ object NotificationMemoryStore {
     }
 
     /**
+     * Get all messages (for analytics)
+     */
+    fun getAllMessages(): List<Message> {
+        return messages.toList()
+    }
+
+    /**
      * Get messages for a specific conversation
      */
     fun getMessagesForConversation(convo_id: String): List<Message> {
@@ -477,5 +484,92 @@ object NotificationMemoryStore {
      */
     fun getUnsentAIReplies(): List<ExternalNotification> {
         return notifications.filter { it.ai_reply.isNotBlank() && !it.is_sent }
+    }
+
+    /**
+     * Delete a specific message
+     */
+    fun deleteMessage(msgHash: String): Boolean {
+        val msgIndex = messages.indexOfFirst { it.msg_hash == msgHash }
+        if (msgIndex != -1) {
+            val message = messages[msgIndex]
+            messages.removeAt(msgIndex)
+
+            // Also remove from notifications list
+            val notifIndex = notifications.indexOfFirst { it.hash == msgHash }
+            if (notifIndex != -1) {
+                val notification = notifications[notifIndex]
+                notifications.removeAt(notifIndex)
+                notificationHashes.remove(notification.hash)
+            }
+
+            // Update conversation's last message if needed
+            val convoIndex = conversations.indexOfFirst { it.convo_id == message.convo_id }
+            if (convoIndex != -1) {
+                val convo = conversations[convoIndex]
+                val remainingMessages = messages.filter { it.convo_id == message.convo_id }
+
+                if (remainingMessages.isEmpty()) {
+                    // No more messages, remove conversation
+                    conversations.removeAt(convoIndex)
+                } else {
+                    // Update with new last message
+                    val lastMsg = remainingMessages.maxByOrNull { it.timestamp }
+                    if (lastMsg != null) {
+                        conversations[convoIndex] = convo.copy(
+                            last_msg_time = lastMsg.timestamp,
+                            last_msg_content = lastMsg.msg_content
+                        )
+                    }
+                }
+            }
+
+            Log.d("NotificationMemoryStore", "✅ Deleted message: $msgHash")
+            return true
+        }
+        return false
+    }
+
+    /**
+     * Delete entire conversation and all its messages
+     */
+    fun deleteConversation(convoId: String): Boolean {
+        // Remove all messages for this conversation
+        val messagesToRemove = messages.filter { it.convo_id == convoId }
+        messagesToRemove.forEach { msg ->
+            messages.remove(msg)
+
+            // Also remove from notifications
+            val notifIndex = notifications.indexOfFirst { it.hash == msg.msg_hash }
+            if (notifIndex != -1) {
+                val notification = notifications[notifIndex]
+                notifications.removeAt(notifIndex)
+                notificationHashes.remove(notification.hash)
+            }
+        }
+
+        // Remove conversation
+        val convoIndex = conversations.indexOfFirst { it.convo_id == convoId }
+        if (convoIndex != -1) {
+            conversations.removeAt(convoIndex)
+            Log.d("NotificationMemoryStore", "✅ Deleted conversation: $convoId with ${messagesToRemove.size} messages")
+            return true
+        }
+
+        return false
+    }
+
+    /**
+     * Get message by hash
+     */
+    fun getMessageByHash(msgHash: String): Message? {
+        return messages.find { it.msg_hash == msgHash }
+    }
+
+    /**
+     * Get conversation by ID
+     */
+    fun getConversationById(convoId: String): Conversation? {
+        return conversations.find { it.convo_id == convoId }
     }
 }
