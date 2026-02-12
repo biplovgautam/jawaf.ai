@@ -728,10 +728,16 @@ fun ConversationDetailScreen(
                     val reminderWithUser = reminder.copy(userId = userId)
 
                     val result = ReminderFirebaseManager.saveReminder(reminderWithUser)
-                    result.onSuccess {
+                    result.onSuccess { savedReminder ->
+                        // Schedule the reminder notification (5 minutes before event)
+                        com.example.jawafai.service.ReminderScheduler.scheduleReminder(
+                            context = context,
+                            reminder = savedReminder
+                        )
+
                         Toast.makeText(
                             context,
-                            "Reminder saved! 🎯 ${reminder.title}",
+                            "Reminder saved & scheduled! 🎯 ${reminder.title}",
                             Toast.LENGTH_SHORT
                         ).show()
                     }.onFailure { error ->

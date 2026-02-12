@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -25,16 +26,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.jawafai.managers.ReminderFirebaseManager
 import com.example.jawafai.model.Reminder
 import com.example.jawafai.model.EventType as ModelEventType
+import com.example.jawafai.service.ReminderScheduler
 import com.example.jawafai.ui.theme.AppFonts
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -60,6 +68,9 @@ fun ReminderScreen() {
     var currentMonth by remember { mutableStateOf(YearMonth.now()) }
     var isLoading by remember { mutableStateOf(true) }
     var reminders by remember { mutableStateOf<List<Reminder>>(emptyList()) }
+
+    // New Reminder Dialog state
+    var showNewReminderDialog by remember { mutableStateOf(false) }
 
     // Load reminders from Firebase
     LaunchedEffect(Unit) {
@@ -141,7 +152,7 @@ fun ReminderScreen() {
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { /* TODO: Add reminder */ },
+                onClick = { showNewReminderDialog = true },
                 containerColor = JawafAccent,
                 contentColor = Color.White,
                 modifier = Modifier.padding(bottom = 70.dp) // Space for bottom nav
@@ -289,6 +300,454 @@ fun ReminderScreen() {
                 Spacer(modifier = Modifier.height(16.dp))
             }
         }
+    }
+
+    // New Reminder Dialog
+    if (showNewReminderDialog) {
+        NewReminderDialog(
+            initialDate = selectedDate,
+            onDismiss = { showNewReminderDialog = false },
+            onSave = { reminder ->
+                coroutineScope.launch {
+                    val userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+                    val reminderWithUser = reminder.copy(userId = userId)
+
+                    val result = ReminderFirebaseManager.saveReminder(reminderWithUser)
+                    result.onSuccess { savedReminder ->
+                        // Schedule the notification
+                        ReminderScheduler.scheduleReminder(context, savedReminder)
+
+                        // Refresh reminders list
+                        val refreshResult = ReminderFirebaseManager.getAllReminders()
+                        refreshResult.onSuccess { fetchedReminders ->
+                            reminders = fetchedReminders
+                        }
+
+                        Toast.makeText(
+                            context,
+                            "Reminder saved & scheduled! 🎯",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }.onFailure { error ->
+                        Toast.makeText(
+                            context,
+                            "Failed to save: ${error.message}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+                showNewReminderDialog = false
+            }
+        )
+    }
+}
+
+/**
+ * Dialog for creating a new reminder
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NewReminderDialog(
+    initialDate: LocalDate = LocalDate.now(),
+    onDismiss: () -> Unit,
+    onSave: (Reminder) -> Unit
+) {
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var selectedDate by remember { mutableStateOf(initialDate) }
+    var selectedTime by remember { mutableStateOf(LocalTime.of(9, 0)) }
+    var selectedEventType by remember { mutableStateOf(EventType.OTHER) }
+
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .padding(16.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(JawafAccent.copy(alpha = 0.1f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.NotificationAdd,
+                                contentDescription = null,
+                                tint = JawafAccent,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "New Reminder",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontFamily = AppFonts.KarlaFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 20.sp,
+                                    color = JawafText
+                                )
+                            )
+                            Text(
+                                text = "Set a new reminder",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = AppFonts.KaiseiDecolFontFamily,
+                                    color = JawafTextSecondary
+                                )
+                            )
+                        }
+                    }
+
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = JawafTextSecondary
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Title Input
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title *") },
+                    placeholder = { Text("e.g., Team Meeting") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = JawafAccent,
+                        cursorColor = JawafAccent
+                    ),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences
+                    ),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Description Input
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description (optional)") },
+                    placeholder = { Text("Add details...") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = JawafAccent,
+                        cursorColor = JawafAccent
+                    ),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Date & Time Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Date Picker
+                    OutlinedCard(
+                        onClick = { showDatePicker = true },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.outlinedCardColors(
+                            containerColor = Color(0xFFF8F8F8)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.CalendarToday,
+                                contentDescription = null,
+                                tint = JawafAccent,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "Date",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = JawafTextSecondary
+                                    )
+                                )
+                                Text(
+                                    text = selectedDate.format(DateTimeFormatter.ofPattern("MMM d, yyyy")),
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontFamily = AppFonts.KarlaFontFamily,
+                                        fontWeight = FontWeight.Medium,
+                                        color = JawafText
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    // Time Picker
+                    OutlinedCard(
+                        onClick = { showTimePicker = true },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.outlinedCardColors(
+                            containerColor = Color(0xFFF8F8F8)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Schedule,
+                                contentDescription = null,
+                                tint = JawafAccent,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "Time",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = JawafTextSecondary
+                                    )
+                                )
+                                Text(
+                                    text = selectedTime.format(DateTimeFormatter.ofPattern("h:mm a")),
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontFamily = AppFonts.KarlaFontFamily,
+                                        fontWeight = FontWeight.Medium,
+                                        color = JawafText
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Event Type Selection
+                Text(
+                    text = "Event Type",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontFamily = AppFonts.KarlaFontFamily,
+                        fontWeight = FontWeight.Medium,
+                        color = JawafText
+                    )
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(EventType.entries.toTypedArray()) { type ->
+                        FilterChip(
+                            selected = selectedEventType == type,
+                            onClick = { selectedEventType = type },
+                            label = {
+                                Text(
+                                    text = type.label,
+                                    fontFamily = AppFonts.KarlaFontFamily,
+                                    fontSize = 12.sp
+                                )
+                            },
+                            leadingIcon = if (selectedEventType == type) {
+                                {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            } else null,
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = JawafAccent.copy(alpha = 0.2f),
+                                selectedLabelColor = JawafAccent
+                            )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Action Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = JawafTextSecondary
+                        )
+                    ) {
+                        Text(
+                            text = "Cancel",
+                            fontFamily = AppFonts.KarlaFontFamily,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            val dateTime = LocalDateTime.of(selectedDate, selectedTime)
+                            val eventTimestamp = dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                            val reminderTimestamp = eventTimestamp - (5 * 60 * 1000) // 5 min before
+
+                            val eventColor = when (selectedEventType) {
+                                EventType.MEETING -> "#4285F4"
+                                EventType.WORK -> "#EA4335"
+                                EventType.PERSONAL -> "#FBBC05"
+                                EventType.HEALTH -> "#34A853"
+                                EventType.OTHER -> "#1BC994"
+                            }
+
+                            val reminder = Reminder(
+                                id = "",
+                                userId = "",
+                                title = title.ifBlank { "Reminder" },
+                                description = description,
+                                eventDate = eventTimestamp,
+                                reminderTime = reminderTimestamp,
+                                eventType = selectedEventType.name,
+                                source = "MANUAL",
+                                sourceConversationId = "",
+                                color = eventColor
+                            )
+                            onSave(reminder)
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = JawafAccent
+                        ),
+                        enabled = title.isNotBlank()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Save",
+                            fontFamily = AppFonts.KarlaFontFamily,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Date Picker Dialog
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = selectedDate.atStartOfDay(ZoneId.systemDefault())
+                .toInstant().toEpochMilli()
+        )
+
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            selectedDate = java.time.Instant.ofEpochMilli(millis)
+                                .atZone(ZoneId.systemDefault())
+                                .toLocalDate()
+                        }
+                        showDatePicker = false
+                    }
+                ) {
+                    Text("OK", color = JawafAccent)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(
+                state = datePickerState,
+                colors = DatePickerDefaults.colors(
+                    selectedDayContainerColor = JawafAccent,
+                    todayDateBorderColor = JawafAccent
+                )
+            )
+        }
+    }
+
+    // Time Picker Dialog
+    if (showTimePicker) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = selectedTime.hour,
+            initialMinute = selectedTime.minute
+        )
+
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        selectedTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
+                        showTimePicker = false
+                    }
+                ) {
+                    Text("OK", color = JawafAccent)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) {
+                    Text("Cancel")
+                }
+            },
+            title = { Text("Select Time") },
+            text = {
+                TimePicker(
+                    state = timePickerState,
+                    colors = TimePickerDefaults.colors(
+                        selectorColor = JawafAccent,
+                        timeSelectorSelectedContainerColor = JawafAccent.copy(alpha = 0.2f)
+                    )
+                )
+            }
+        )
     }
 }
 

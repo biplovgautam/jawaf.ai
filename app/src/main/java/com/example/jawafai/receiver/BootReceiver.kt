@@ -6,6 +6,10 @@ import android.content.Intent
 import android.util.Log
 import com.example.jawafai.managers.NotificationHealthManager
 import com.example.jawafai.service.JawafaiNotificationListenerService
+import com.example.jawafai.service.ReminderScheduler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * Boot Receiver for Self-Healing Service Restart
@@ -14,6 +18,7 @@ import com.example.jawafai.service.JawafaiNotificationListenerService
  * to restart the JawafaiNotificationListenerService after device boot.
  *
  * This ensures 24/7 persistence even after device restarts.
+ * Also reschedules all reminder notifications.
  */
 class BootReceiver : BroadcastReceiver() {
 
@@ -65,8 +70,26 @@ class BootReceiver : BroadcastReceiver() {
             NotificationHealthManager.scheduleHealthCheckWorker(context)
             Log.d(TAG, "✅ Health check workers scheduled")
 
+            // Reschedule all reminder notifications
+            rescheduleReminders(context)
+
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error during boot initialization: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Reschedule all upcoming reminders after device boot
+     */
+    private fun rescheduleReminders(context: Context) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                Log.d(TAG, "📅 Rescheduling all reminder notifications...")
+                ReminderScheduler.rescheduleAllReminders(context)
+                Log.d(TAG, "✅ Reminder notifications rescheduled")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Failed to reschedule reminders: ${e.message}", e)
+            }
         }
     }
 }

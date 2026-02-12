@@ -26,6 +26,10 @@
     <!-- Wake lock for keeping service alive -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- Exact alarm permission for reminder notifications (Android 12+) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
 
     <application
         android:name=".JawafaiApplication"
@@ -108,6 +112,27 @@
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Reminder Alarm Receiver - handles scheduled reminder notifications -->
+        <receiver
+            android:name=".service.ReminderAlarmReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.jawafai.ACTION_SHOW_REMINDER" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Reminder Action Receiver - handles notification actions (Mark Done, Snooze) -->
+        <receiver
+            android:name=".service.ReminderActionReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.jawafai.ACTION_MARK_DONE" />
+                <action android:name="com.example.jawafai.ACTION_SNOOZE" />
             </intent-filter>
         </receiver>
 
