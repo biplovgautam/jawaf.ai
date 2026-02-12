@@ -16,6 +16,7 @@ object NotificationAIReplyManager {
 
     private const val TAG = "NotificationAIReply"
     private const val MAX_CONTEXT_MESSAGES = 10
+    private const val DEFAULT_CONTEXT_MESSAGES = 15
 
     /**
      * Generate AI reply for a notification with conversation context
@@ -88,6 +89,221 @@ object NotificationAIReplyManager {
                 conversationId = notification.conversationId
             )
         }
+    }
+
+    /**
+     * Generate AI reply with enhanced context - uses conversation ID to fetch history
+     * This is the preferred method for generating personalized replies
+     */
+    suspend fun generateAIReplyWithContext(
+        notification: NotificationMemoryStore.ExternalNotification,
+        conversationId: String,
+        maxContextMessages: Int = DEFAULT_CONTEXT_MESSAGES,
+        userPersona: Map<String, Any>? = null,
+        context: Context
+    ): AIReplyResult = withContext(Dispatchers.IO) {
+
+        try {
+            Log.d(TAG, "🤖 Generating AI reply with enhanced context")
+            Log.d(TAG, "📱 App: ${notification.packageName}")
+            Log.d(TAG, "👤 Sender: ${notification.sender}")
+            Log.d(TAG, "💬 Current Message: ${notification.text}")
+            Log.d(TAG, "🔑 Conversation ID: $conversationId")
+            Log.d(TAG, "📊 Max Context Messages: $maxContextMessages")
+
+            // Get conversation messages from memory store
+            val conversationMessages = NotificationMemoryStore.getMessagesForConversation(conversationId)
+                .takeLast(maxContextMessages)
+
+            Log.d(TAG, "📚 Retrieved ${conversationMessages.size} messages for context")
+
+            // Convert messages to chat format
+            val chatHistory = convertMessagesToChatFormat(conversationMessages)
+
+            // Get app name for context
+            val appName = getAppName(notification.packageName)
+            val senderName = notification.sender ?: notification.title
+
+            // Build persona context string
+            val personaContext = buildPersonaContext(userPersona)
+            if (personaContext != null) {
+                Log.d(TAG, "👤 User persona loaded with ${userPersona?.size ?: 0} attributes")
+            }
+
+            // Generate reply using GroqApiManager with enhanced context
+            val groqResponse = GroqApiManager.getNotificationReplyWithPersona(
+                currentMessage = notification.text,
+                senderName = senderName,
+                appName = appName,
+                conversationHistory = chatHistory,
+                personaContext = personaContext
+            )
+
+            if (groqResponse.success && groqResponse.message != null) {
+                Log.d(TAG, "✅ AI reply generated successfully with context")
+                Log.d(TAG, "🎯 Reply: ${groqResponse.message.take(100)}...")
+
+                // Update message with AI reply
+                NotificationMemoryStore.updateAIReply(notification.hash, groqResponse.message)
+
+                return@withContext AIReplyResult(
+                    success = true,
+                    reply = groqResponse.message,
+                    error = null,
+                    conversationId = conversationId
+                )
+            } else {
+                Log.e(TAG, "❌ AI reply generation failed: ${groqResponse.error}")
+                return@withContext AIReplyResult(
+                    success = false,
+                    reply = null,
+                    error = groqResponse.error ?: "Unknown error",
+                    conversationId = conversationId
+                )
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Exception in AI reply generation: ${e.message}", e)
+            return@withContext AIReplyResult(
+                success = false,
+                reply = null,
+                error = e.message ?: "Unknown error",
+                conversationId = conversationId
+            )
+        }
+    }
+
+    /**
+     * Generate AI reply from a Message object (when notification is not available)
+     */
+    suspend fun generateAIReplyFromMessage(
+        message: NotificationMemoryStore.Message,
+        conversationId: String,
+        displayName: String,
+        packageName: String,
+        maxContextMessages: Int = DEFAULT_CONTEXT_MESSAGES,
+        userPersona: Map<String, Any>? = null,
+        context: Context
+    ): AIReplyResult = withContext(Dispatchers.IO) {
+
+        try {
+            Log.d(TAG, "🤖 Generating AI reply from message object")
+            Log.d(TAG, "💬 Message: ${message.msg_content}")
+            Log.d(TAG, "👤 Sender: ${message.sender_name}")
+            Log.d(TAG, "🔑 Conversation ID: $conversationId")
+
+            // Get conversation messages for context
+            val conversationMessages = NotificationMemoryStore.getMessagesForConversation(conversationId)
+                .takeLast(maxContextMessages)
+
+            Log.d(TAG, "📚 Retrieved ${conversationMessages.size} messages for context")
+
+            // Convert messages to chat format
+            val chatHistory = convertMessagesToChatFormat(conversationMessages)
+
+            // Get app name
+            val appName = getAppName(packageName)
+
+            // Build persona context string
+            val personaContext = buildPersonaContext(userPersona)
+
+            // Generate reply
+            val groqResponse = GroqApiManager.getNotificationReplyWithPersona(
+                currentMessage = message.msg_content,
+                senderName = message.sender_name.ifBlank { displayName },
+                appName = appName,
+                conversationHistory = chatHistory,
+                personaContext = personaContext
+            )
+
+            if (groqResponse.success && groqResponse.message != null) {
+                Log.d(TAG, "✅ AI reply generated successfully")
+
+                // Update message with AI reply
+                NotificationMemoryStore.updateMessageAIReply(message.msg_hash, groqResponse.message)
+
+                return@withContext AIReplyResult(
+                    success = true,
+                    reply = groqResponse.message,
+                    error = null,
+                    conversationId = conversationId
+                )
+            } else {
+                return@withContext AIReplyResult(
+                    success = false,
+                    reply = null,
+                    error = groqResponse.error ?: "Unknown error",
+                    conversationId = conversationId
+                )
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Exception: ${e.message}", e)
+            return@withContext AIReplyResult(
+                success = false,
+                reply = null,
+                error = e.message ?: "Unknown error",
+                conversationId = conversationId
+            )
+        }
+    }
+
+    /**
+     * Convert Message objects to chat format for AI
+     */
+    private fun convertMessagesToChatFormat(
+        messages: List<NotificationMemoryStore.Message>
+    ): List<GroqApiManager.ChatMessage> {
+        val chatMessages = mutableListOf<GroqApiManager.ChatMessage>()
+
+        messages.forEach { message ->
+            // Incoming messages as "user" role
+            if (!message.is_outgoing) {
+                chatMessages.add(
+                    GroqApiManager.ChatMessage(
+                        role = "user",
+                        content = "${message.sender_name}: ${message.msg_content}"
+                    )
+                )
+            } else {
+                // Outgoing messages or AI replies as "assistant" role
+                chatMessages.add(
+                    GroqApiManager.ChatMessage(
+                        role = "assistant",
+                        content = message.msg_content
+                    )
+                )
+            }
+
+            // Add AI reply if available
+            if (message.ai_reply.isNotBlank() && !message.is_outgoing) {
+                chatMessages.add(
+                    GroqApiManager.ChatMessage(
+                        role = "assistant",
+                        content = message.ai_reply
+                    )
+                )
+            }
+        }
+
+        return chatMessages
+    }
+
+    /**
+     * Build persona context string from user persona map
+     */
+    private fun buildPersonaContext(userPersona: Map<String, Any>?): String? {
+        if (userPersona.isNullOrEmpty()) return null
+
+        val personaBuilder = StringBuilder()
+        personaBuilder.append("User Persona:\n")
+
+        userPersona.forEach { (key, value) ->
+            val formattedKey = key.replace("_", " ").replaceFirstChar { it.uppercase() }
+            personaBuilder.append("- $formattedKey: $value\n")
+        }
+
+        return personaBuilder.toString()
     }
 
     /**

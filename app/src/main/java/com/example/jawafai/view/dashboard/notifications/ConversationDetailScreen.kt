@@ -1,5 +1,6 @@
 package com.example.jawafai.view.dashboard.notifications
 
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -37,7 +38,10 @@ import com.example.jawafai.ui.theme.AppFonts
 import com.example.jawafai.view.ui.theme.JawafAccent
 import com.example.jawafai.view.ui.theme.JawafText
 import com.example.jawafai.managers.NotificationFirebaseManager
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -104,7 +108,36 @@ fun ConversationDetailScreen(
         }
     }
 
-    // Generate AI Reply function
+    // Load user persona from Firebase - defined as a suspend function
+    suspend fun loadUserPersonaFromFirebase(): Map<String, Any>? {
+        return try {
+            val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+                ?: return null
+
+            val personaRef = FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(currentUserId)
+                .collection("persona")
+
+            val personaData = personaRef.get().await()
+
+            val persona = mutableMapOf<String, Any>()
+            personaData.documents.forEach { document ->
+                document.getString("answer")?.let { answer ->
+                    if (answer.isNotBlank()) {
+                        persona[document.id] = answer
+                    }
+                }
+            }
+
+            if (persona.isNotEmpty()) persona else null
+        } catch (e: Exception) {
+            Log.e("ConversationDetail", "Failed to load user persona: ${e.message}")
+            null
+        }
+    }
+
+    // Generate AI Reply function with conversation context and user persona
     fun generateAIReply(message: NotificationMemoryStore.Message) {
         coroutineScope.launch {
             try {
@@ -116,9 +149,15 @@ fun ConversationDetailScreen(
                     .find { it.hash == message.msg_hash }
 
                 if (notification != null) {
-                    val result = NotificationAIReplyManager.generateAIReply(
+                    // Load user persona from Firebase for personalized responses
+                    val userPersona = loadUserPersonaFromFirebase()
+
+                    // Generate AI reply with persona context
+                    val result = NotificationAIReplyManager.generateAIReplyWithContext(
                         notification = notification,
-                        userPersona = null,
+                        conversationId = conversationId,
+                        maxContextMessages = 15, // Last 15 messages for better context
+                        userPersona = userPersona,
                         context = context
                     )
 
@@ -131,7 +170,27 @@ fun ConversationDetailScreen(
                         Toast.makeText(context, "Failed: ${result.error}", Toast.LENGTH_LONG).show()
                     }
                 } else {
-                    Toast.makeText(context, "Could not find notification", Toast.LENGTH_SHORT).show()
+                    // Fallback: Create notification from message if not found in store
+                    val userPersona = loadUserPersonaFromFirebase()
+
+                    val result = NotificationAIReplyManager.generateAIReplyFromMessage(
+                        message = message,
+                        conversationId = conversationId,
+                        displayName = conversation?.display_name ?: "Unknown",
+                        packageName = conversation?.package_name ?: "",
+                        maxContextMessages = 15,
+                        userPersona = userPersona,
+                        context = context
+                    )
+
+                    if (result.success && result.reply != null) {
+                        editableReplyText = result.reply
+                        selectedMessageForReply = message
+                        showAIReplyDialog = true
+                        Toast.makeText(context, "AI reply generated! ✨", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "Failed: ${result.error}", Toast.LENGTH_LONG).show()
+                    }
                 }
             } catch (e: Exception) {
                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()

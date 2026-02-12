@@ -316,6 +316,128 @@ object GroqApiManager {
     }
 
     /**
+     * Enhanced notification reply generation with persona context string
+     * This method accepts a pre-built persona context for more flexibility
+     */
+    suspend fun getNotificationReplyWithPersona(
+        currentMessage: String,
+        senderName: String,
+        appName: String,
+        conversationHistory: List<ChatMessage>,
+        personaContext: String? = null
+    ): GroqResponse = withContext(Dispatchers.IO) {
+        try {
+            if (GROQ_API_KEY.isBlank() || GROQ_API_KEY == "null") {
+                Log.e(TAG, "❌ Groq API key is not configured properly")
+                return@withContext GroqResponse(
+                    success = false,
+                    message = null,
+                    error = "API key not configured"
+                )
+            }
+
+            Log.d(TAG, "📱 Sending enhanced notification reply request to Groq API...")
+            Log.d(TAG, "👤 Sender: $senderName")
+            Log.d(TAG, "📱 App: $appName")
+            Log.d(TAG, "💬 Message: $currentMessage")
+            Log.d(TAG, "📚 Conversation history: ${conversationHistory.size} messages")
+            Log.d(TAG, "👤 Has persona context: ${personaContext != null}")
+
+            val messages = JSONArray()
+
+            // Build enhanced system prompt with persona
+            val systemPrompt = buildEnhancedNotificationSystemPrompt(appName, personaContext)
+            val systemMessage = JSONObject().apply {
+                put("role", "system")
+                put("content", systemPrompt)
+            }
+            messages.put(systemMessage)
+
+            // Add conversation history (last 15 messages for better context)
+            conversationHistory.takeLast(15).forEach { historyMessage ->
+                val messageObj = JSONObject().apply {
+                    put("role", historyMessage.role)
+                    put("content", historyMessage.content)
+                }
+                messages.put(messageObj)
+            }
+
+            // Add current message to reply to
+            val currentMessageObj = JSONObject().apply {
+                put("role", "user")
+                put("content", "Reply to this message from $senderName: \"$currentMessage\"")
+            }
+            messages.put(currentMessageObj)
+
+            return@withContext sendGroqRequest(messages, "notification_reply_persona")
+
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Exception in enhanced notification reply API call: ${e.message}", e)
+            return@withContext GroqResponse(
+                success = false,
+                message = null,
+                error = e.message ?: "Unknown error occurred"
+            )
+        }
+    }
+
+    /**
+     * Build enhanced system prompt with persona context
+     */
+    private fun buildEnhancedNotificationSystemPrompt(appName: String, personaContext: String?): String {
+        val basePrompt = """
+        You are Jawaf AI — a smart reply assistant for $appName messages.
+        
+        Your job is to generate short, natural-sounding replies that feel authentic to the user's personality.
+
+        🎯 Guidelines:
+        - Match the **language** of the input message (English, Roman Nepali, Hindi, or a mix)
+        - Match the **tone** and **relationship** — be casual with friends, polite with unknowns
+        - Keep it realistic: reply how people chat in messaging apps
+        - Reply in **1–2 short lines only**
+        - Don't translate. **Reply in the same script/language**
+        - Use emojis only when it fits the vibe
+        - Sound natural and human, not robotic
+
+        ✨ Examples:
+        
+        Input: "Are you free today?"
+        Reply: "Yeah, after 4pm I'm free."
+
+        Input: "k xa?"
+        Reply: "thik xa, tero ni?"
+        
+        Input: "Let's meet around 6?"
+        Reply: "Sounds good, see you then!"
+
+        Input: "khana khayau?"
+        Reply: "khaye, timi?"
+
+        Input: "aile k gardai xas?"
+        Reply: "just chilling bro, kei special xaina"
+        
+        Input: "miss you"
+        Reply: "miss you too ❤️"
+
+        ⛔ Output ONLY the reply text. No explanation, no formatting, no extra info.
+    """.trimIndent()
+
+        // Append persona context if available
+        return if (!personaContext.isNullOrBlank()) {
+            """
+            $basePrompt
+            
+            📋 IMPORTANT - Personalize your response based on this user's profile:
+            $personaContext
+            
+            Use the above information to make your replies feel more personal and authentic to this specific user.
+            """.trimIndent()
+        } else {
+            basePrompt
+        }
+    }
+
+    /**
      * Common method to send request to Groq API
      */
     private suspend fun sendGroqRequest(messages: JSONArray, requestType: String): GroqResponse {
