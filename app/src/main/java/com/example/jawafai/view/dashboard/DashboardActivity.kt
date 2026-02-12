@@ -349,6 +349,7 @@ fun DashboardScreen(
                 ) {
                     HomeScreen(
                         onProfileClick = { navController.navigate(BottomNavItem.Profile.route) },
+                        onSettingsClick = { navigateToTab(4) }, // Settings is at index 4
                         onChatBotClick = { navController.navigate("chatbot") },
                         onCompletePersonaClick = { navController.navigate("settings/persona") },
                         onRecentChatClick = { chatId, otherUserId ->
@@ -356,10 +357,13 @@ fun DashboardScreen(
                         },
                         onNotificationClick = {
                             // Navigate to notifications tab instead of using navigate()
-                            navigateToTab(3) // Notifications is at index 3 (Home=0, Analytics=1, Chat=2, Notifications=3)
+                            navigateToTab(2) // Messages is at index 2 (Home=0, Analytics=1, Messages=2, Reminders=3, Settings=4)
                         },
                         onSeeAllChatsClick = {
-                            navigateToTab(2) // Chat is at index 2
+                            navigateToTab(2) // Messages is at index 2
+                        },
+                        onAnalyticsClick = {
+                            navigateToTab(1) // Analytics is at index 1
                         }
                     )
                 }

@@ -61,6 +61,12 @@ data class SettingsItemData(
     val tint: Color = Color.Unspecified
 )
 
+// Theme colors matching app
+private val JawafAccent = Color(0xFF1BC994)
+private val JawafText = Color(0xFF191919)
+private val JawafTextSecondary = Color(0xFF666666)
+private val JawafBackground = Color(0xFFFAFAFA)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -113,32 +119,46 @@ fun SettingsScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        containerColor = Color.White,
+        containerColor = JawafBackground,
         topBar = {
-            TopAppBar(
-                title = {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = Color.White,
+                shadowElevation = 2.dp
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                ) {
                     Text(
                         text = "Settings",
                         style = MaterialTheme.typography.headlineMedium.copy(
                             fontFamily = AppFonts.KarlaFontFamily,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 24.sp,
-                            color = Color(0xFF395B64)
+                            fontSize = 28.sp,
+                            color = JawafText
                         )
                     )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
-                ),
-                modifier = Modifier.statusBarsPadding()
-            )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Manage your preferences",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = AppFonts.KaiseiDecolFontFamily,
+                            fontSize = 14.sp,
+                            color = JawafTextSecondary
+                        )
+                    )
+                }
+            }
         }
     ) { paddingValues ->
         SettingsContent(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = paddingValues.calculateTopPadding())
-                .background(Color.White),
+                .background(JawafBackground),
             onLogout = onLogout,
             onProfileClicked = onProfileClicked,
             onPersonaClicked = onPersonaClicked,
@@ -174,7 +194,7 @@ fun SettingsContent(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
             Spacer(modifier = Modifier.height(8.dp))
@@ -193,15 +213,7 @@ fun SettingsContent(
 
         // Persona Section
         item {
-            Text(
-                text = "Personalization",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontFamily = AppFonts.KarlaFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = Color(0xFF395B64)
-                )
-            )
+            SettingsSectionTitle(title = "Personalization")
         }
 
         item {
@@ -213,15 +225,7 @@ fun SettingsContent(
 
         // Integrated Platforms Section
         item {
-            Text(
-                text = "Integrated Platforms",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontFamily = AppFonts.KarlaFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = Color(0xFF395B64)
-                )
-            )
+            SettingsSectionTitle(title = "Connected Apps")
         }
 
         item {
@@ -234,15 +238,7 @@ fun SettingsContent(
 
         // Notification Health Section
         item {
-            Text(
-                text = "Notification Status",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontFamily = AppFonts.KarlaFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = Color(0xFF395B64)
-                )
-            )
+            SettingsSectionTitle(title = "Notification Status")
         }
 
         item {
@@ -251,15 +247,7 @@ fun SettingsContent(
 
         // About Section
         item {
-            Text(
-                text = "App Information",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontFamily = AppFonts.KarlaFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = Color(0xFF395B64)
-                )
-            )
+            SettingsSectionTitle(title = "About")
         }
 
         item {
@@ -271,15 +259,7 @@ fun SettingsContent(
 
         // Account Actions
         item {
-            Text(
-                text = "Account",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontFamily = AppFonts.KarlaFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = Color(0xFF395B64)
-                )
-            )
+            SettingsSectionTitle(title = "Account")
         }
 
         item {
@@ -289,9 +269,23 @@ fun SettingsContent(
         // Add bottom padding for navigation bar
         item {
             Spacer(modifier = Modifier.navigationBarsPadding())
-            Spacer(modifier = Modifier.height(80.dp)) // Extra space for bottom navigation
+            Spacer(modifier = Modifier.height(80.dp))
         }
     }
+}
+
+@Composable
+fun SettingsSectionTitle(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium.copy(
+            fontFamily = AppFonts.KarlaFontFamily,
+            fontWeight = FontWeight.Bold,
+            fontSize = 16.sp,
+            color = JawafText
+        ),
+        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+    )
 }
 
 @Composable
@@ -306,7 +300,7 @@ fun UserProfileCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
@@ -324,11 +318,11 @@ fun UserProfileCard(
                     modifier = Modifier
                         .size(64.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFA5C9CA))
+                        .background(JawafAccent.copy(alpha = 0.2f))
                 ) {
                     Image(
                         painter = rememberAsyncImagePainter(
-                            model = profileImageUrl.ifEmpty { "https://ui-avatars.com/api/?name=$name&background=A5C9CA&color=ffffff" }
+                            model = profileImageUrl.ifEmpty { "https://ui-avatars.com/api/?name=$name&background=1BC994&color=ffffff" }
                         ),
                         contentDescription = "Profile picture",
                         modifier = Modifier.fillMaxSize(),
@@ -387,7 +381,7 @@ fun UserProfileCard(
                         fontFamily = AppFonts.KarlaFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 20.sp,
-                        color = Color(0xFF395B64)
+                        color = JawafText
                     )
                 )
 
@@ -398,7 +392,7 @@ fun UserProfileCard(
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontFamily = AppFonts.KaiseiDecolFontFamily,
                         fontSize = 14.sp,
-                        color = Color(0xFF666666)
+                        color = JawafTextSecondary
                     )
                 )
             }
@@ -406,7 +400,7 @@ fun UserProfileCard(
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = "Edit Profile",
-                tint = Color(0xFF395B64),
+                tint = JawafAccent,
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -429,9 +423,9 @@ fun PersonaCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFFF8F9FA)
+            containerColor = Color.White
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
@@ -458,7 +452,7 @@ fun PersonaCard(
                             .align(Alignment.BottomEnd)
                             .size(20.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF395B64)),
+                            .background(JawafAccent),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -483,18 +477,18 @@ fun PersonaCard(
                         fontFamily = AppFonts.KarlaFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
-                        color = Color(0xFF395B64)
+                        color = JawafText
                     )
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = if (completed) "Persona completed" else "Complete your persona for better responses",
+                    text = if (completed) "Persona completed ✓" else "Complete for better responses",
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontFamily = AppFonts.KaiseiDecolFontFamily,
                         fontSize = 14.sp,
-                        color = Color(0xFF666666)
+                        color = if (completed) JawafAccent else JawafTextSecondary
                     )
                 )
             }
@@ -502,7 +496,7 @@ fun PersonaCard(
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = "Navigate",
-                tint = Color(0xFF395B64),
+                tint = JawafAccent,
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -529,40 +523,33 @@ fun LogoutCard(onLogout: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onLogout() },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF5F5)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEBEE)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.error.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ExitToApp,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                contentDescription = null,
+                tint = Color(0xFFE53935),
+                modifier = Modifier.size(22.dp)
+            )
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
             Text(
-                text = "Logout",
+                text = "Sign Out",
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontFamily = AppFonts.KarlaFontFamily,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = MaterialTheme.colorScheme.error
+                    fontSize = 16.sp,
+                    color = Color(0xFFE53935)
                 )
             )
         }

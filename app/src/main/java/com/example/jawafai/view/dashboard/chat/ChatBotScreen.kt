@@ -781,16 +781,16 @@ fun EnhancedEmptyStateView(onSuggestionClick: (String) -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         item {
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             LottieAnimation(
                 composition = composition,
                 progress = { progress },
-                modifier = Modifier.size(200.dp)
+                modifier = Modifier.size(160.dp)
             )
         }
 
@@ -803,61 +803,88 @@ fun EnhancedEmptyStateView(onSuggestionClick: (String) -> Unit) {
                     style = MaterialTheme.typography.headlineSmall.copy(
                         fontFamily = AppFonts.KarlaFontFamily,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 24.sp,
-                        color = Color(0xFF395B64)
+                        fontSize = 22.sp,
+                        color = Color(0xFF1BC994)
                     ),
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "I'm here to listen, support, and help you through whatever you're going through. Let's have a meaningful conversation!",
+                    text = "I'm here to listen, support, and help you stay organized!",
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontFamily = AppFonts.KaiseiDecolFontFamily,
-                        fontSize = 16.sp,
+                        fontSize = 14.sp,
                         color = Color(0xFF666666),
-                        lineHeight = 22.sp
+                        lineHeight = 20.sp
                     ),
                     textAlign = TextAlign.Center
                 )
             }
         }
 
-        // Enhanced Emotional Support Suggestions
+        // Quick Action Chips Row
+        item {
+            QuickActionChips(onSuggestionClick = onSuggestionClick)
+        }
+
+        // Reminders & Planning Section
         item {
             EnhancedSuggestionCard(
-                title = "💭 Let's Talk",
+                title = "⏰ Set Reminders",
+                emoji = "📅",
+                accentColor = Color(0xFF1BC994),
                 suggestions = listOf(
-                    "I'm feeling low today",
-                    "Tell me a joke to cheer me up",
-                    "I need some motivation"
+                    "Remind me to call mom tomorrow at 6 PM",
+                    "Set a reminder for my meeting on Monday 9 AM",
+                    "Don't let me forget to exercise at 7 AM daily"
                 ),
                 onSuggestionClick = onSuggestionClick
             )
         }
 
-        // Enhanced Productivity Suggestions
+        // Emotional Support Section
         item {
             EnhancedSuggestionCard(
-                title = "📅 Daily Support",
+                title = "💭 I Need Support",
+                emoji = "🤗",
+                accentColor = Color(0xFF4285F4),
                 suggestions = listOf(
-                    "Help me plan my day",
-                    "I'm feeling overwhelmed with tasks",
-                    "Give me some productivity tips"
+                    "I'm feeling low today, can we talk?",
+                    "I'm stressed about work, help me relax",
+                    "I need some motivation right now",
+                    "Help me calm my anxiety"
                 ),
                 onSuggestionClick = onSuggestionClick
             )
         }
 
-        // Enhanced Learning & Fun Suggestions
+        // Productivity Section
         item {
             EnhancedSuggestionCard(
-                title = "🌟 Learn & Explore",
+                title = "🚀 Be Productive",
+                emoji = "✨",
+                accentColor = Color(0xFFFFB800),
                 suggestions = listOf(
-                    "Tell me an interesting scientific fact",
-                    "Explain something fascinating",
-                    "Share some life wisdom"
+                    "Help me plan my day effectively",
+                    "Give me 3 tips to stay focused",
+                    "I'm procrastinating, motivate me!"
+                ),
+                onSuggestionClick = onSuggestionClick
+            )
+        }
+
+        // Fun & Learning Section
+        item {
+            EnhancedSuggestionCard(
+                title = "🌟 Fun & Learn",
+                emoji = "🎯",
+                accentColor = Color(0xFFE4405F),
+                suggestions = listOf(
+                    "Tell me something interesting",
+                    "Share a fun fact about space",
+                    "Tell me a joke to cheer me up"
                 ),
                 onSuggestionClick = onSuggestionClick
             )
@@ -870,8 +897,48 @@ fun EnhancedEmptyStateView(onSuggestionClick: (String) -> Unit) {
 }
 
 @Composable
+fun QuickActionChips(onSuggestionClick: (String) -> Unit) {
+    val quickActions = listOf(
+        "😊" to "I'm happy today!",
+        "😔" to "I feel sad",
+        "😰" to "I'm anxious",
+        "💪" to "Motivate me!",
+        "⏰" to "Set reminder"
+    )
+
+    androidx.compose.foundation.lazy.LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = 4.dp)
+    ) {
+        items(quickActions.size) { index ->
+            val (emoji, message) = quickActions[index]
+            AssistChip(
+                onClick = { onSuggestionClick(message) },
+                label = {
+                    Text(
+                        text = emoji,
+                        fontSize = 18.sp
+                    )
+                },
+                colors = AssistChipDefaults.assistChipColors(
+                    containerColor = Color.White
+                ),
+                border = AssistChipDefaults.assistChipBorder(
+                    borderColor = Color(0xFFE0E0E0),
+                    borderWidth = 1.dp,
+                    enabled = true
+                ),
+                shape = RoundedCornerShape(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
 fun EnhancedSuggestionCard(
     title: String,
+    emoji: String = "",
+    accentColor: Color = Color(0xFF1BC994),
     suggestions: List<String>,
     onSuggestionClick: (String) -> Unit
 ) {
@@ -879,44 +946,72 @@ fun EnhancedSuggestionCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
-            modifier = Modifier.padding(20.dp)
+            modifier = Modifier.padding(16.dp)
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontFamily = AppFonts.KarlaFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = Color(0xFF395B64)
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(accentColor.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = emoji,
+                        fontSize = 16.sp
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontFamily = AppFonts.KarlaFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = Color(0xFF191919)
+                    )
                 )
-            )
+            }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             suggestions.forEach { suggestion ->
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .clickable {
-                            onSuggestionClick(suggestion)
-                        },
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF0F8FF)),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        .padding(vertical = 3.dp)
+                        .clickable { onSuggestionClick(suggestion) },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = accentColor.copy(alpha = 0.08f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
-                    Text(
-                        text = suggestion,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontFamily = AppFonts.KaiseiDecolFontFamily,
-                            fontSize = 14.sp,
-                            color = Color(0xFF333333)
-                        ),
-                        modifier = Modifier.padding(16.dp)
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = suggestion,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontFamily = AppFonts.KaiseiDecolFontFamily,
+                                fontSize = 13.sp,
+                                color = Color(0xFF333333)
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Send,
+                            contentDescription = null,
+                            tint = accentColor,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
         }

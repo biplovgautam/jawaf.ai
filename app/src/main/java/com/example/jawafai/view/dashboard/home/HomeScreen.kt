@@ -25,9 +25,11 @@ import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.rounded.ChatBubble
+import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -93,11 +95,13 @@ data class Notification(
 @Composable
 fun HomeScreen(
     onProfileClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     onChatBotClick: () -> Unit = {},
     onCompletePersonaClick: () -> Unit = {},
     onRecentChatClick: (String, String) -> Unit = { _, _ -> },
     onNotificationClick: () -> Unit = {},
-    onSeeAllChatsClick: () -> Unit = {}
+    onSeeAllChatsClick: () -> Unit = {},
+    onAnalyticsClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -162,10 +166,10 @@ fun HomeScreen(
         userViewModel.fetchUserProfile()
     }
 
-    // Get top 3 conversations from NotificationMemoryStore
-    val conversations = remember { NotificationMemoryStore.getAllConversations() }
-    val topConversations = remember(conversations) {
-        conversations.sortedByDescending { it.last_msg_time }.take(3)
+    // Get top 3 conversations from NotificationMemoryStore for display
+    val allConversations = remember { NotificationMemoryStore.getAllConversations() }
+    val topConversations = remember(allConversations) {
+        allConversations.sortedByDescending { it.last_msg_time }.take(3)
     }
 
     Scaffold(
@@ -199,7 +203,7 @@ fun HomeScreen(
                     // Enhanced Username and Profile section with PRO badge
                     Card(
                         modifier = Modifier
-                            .clickable { onProfileClick() },
+                            .clickable { onSettingsClick() },
                         shape = RoundedCornerShape(24.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = JawafAccent.copy(alpha = 0.1f)
@@ -249,6 +253,42 @@ fun HomeScreen(
             }
         }
     ) { paddingValues ->
+        // Get analytics data
+        val messages = remember { NotificationMemoryStore.getAllMessages() }
+        val totalMessages = messages.size
+        val repliesSent = messages.count { it.is_sent }
+        val aiRepliesGenerated = messages.count { it.ai_reply.isNotBlank() }
+
+        // Calculate communication health score (EXACT SAME as Analytics page)
+        val replySpeed = remember(messages) {
+            calculateHomeReplySpeed(messages)
+        }
+
+        val incomingMessages = messages.filter { !it.is_outgoing }
+        val ignoredMessages = incomingMessages.count { msg ->
+            val hasReply = messages.any {
+                it.convo_id == msg.convo_id &&
+                it.is_outgoing &&
+                it.timestamp > msg.timestamp
+            }
+            !hasReply && msg.ai_reply.isBlank()
+        }
+        val ghostingRate = if (incomingMessages.isNotEmpty()) {
+            ((ignoredMessages.toFloat() / incomingMessages.size) * 100).toInt().coerceIn(0, 100)
+        } else 0
+
+        // Use ALL conversations for calculation, not just top 3
+        val consistency = remember(messages, allConversations) {
+            calculateHomeConsistency(messages, allConversations)
+        }
+
+        val engagement = remember(messages, allConversations) {
+            calculateHomeEngagement(messages, allConversations)
+        }
+
+        val inverseGhosting = 100 - ghostingRate
+        val communicationHealth = ((replySpeed * 0.30f) + (inverseGhosting * 0.30f) + (consistency * 0.20f) + (engagement * 0.20f)).toInt().coerceIn(0, 100)
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -256,13 +296,13 @@ fun HomeScreen(
                 .padding(top = paddingValues.calculateTopPadding())
                 .padding(bottom = 36.dp)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
             }
 
-            // Hero Section
+            // Hero Section - Compact
             item {
                 HeroSection(userFirstName = userFirstName ?: "User")
             }
@@ -277,12 +317,28 @@ fun HomeScreen(
                 }
             }
 
-            // Chat Bot Section
+            // 2 Column Row: Chat Bot & Activity with Health
             item {
-                ChatBotSection(onChatBotClick = onChatBotClick)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // AI Companion Card - Left Column (with Lottie)
+                    CompactChatBotCard(
+                        onChatBotClick = onChatBotClick,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    // Activity Card with Communication Health - Right Column (Clickable)
+                    ActivityHealthCard(
+                        healthPercentage = communicationHealth,
+                        onClick = onAnalyticsClick,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
 
-            // Messages Section (renamed from Smart Notifications, shows top 3 conversations)
+            // Messages Section
             item {
                 MessagesSection(
                     conversations = topConversations,
@@ -295,6 +351,338 @@ fun HomeScreen(
             item {
                 Spacer(modifier = Modifier.navigationBarsPadding())
                 Spacer(modifier = Modifier.height(20.dp))
+            }
+        }
+    }
+}
+
+/**
+ * Analytics Stats Row - 2x2 Grid
+ */
+@Composable
+fun AnalyticsStatsRow(
+    totalMessages: Int,
+    conversations: Int,
+    repliesSent: Int,
+    aiGenerated: Int
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "Your Stats",
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontFamily = AppFonts.KarlaFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                color = JawafText
+            )
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            StatCard(
+                value = totalMessages.toString(),
+                label = "Messages",
+                icon = Icons.Filled.Message,
+                color = JawafAccent,
+                modifier = Modifier.weight(1f)
+            )
+            StatCard(
+                value = conversations.toString(),
+                label = "Chats",
+                icon = Icons.Filled.Chat,
+                color = Color(0xFF4285F4),
+                modifier = Modifier.weight(1f)
+            )
+            StatCard(
+                value = repliesSent.toString(),
+                label = "Sent",
+                icon = Icons.AutoMirrored.Filled.Send,
+                color = Color(0xFF34A853),
+                modifier = Modifier.weight(1f)
+            )
+            StatCard(
+                value = aiGenerated.toString(),
+                label = "AI",
+                icon = Icons.Filled.AutoAwesome,
+                color = Color(0xFFFFB800),
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+fun StatCard(
+    value: String,
+    label: String,
+    icon: ImageVector,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(color.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontFamily = AppFonts.KarlaFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = JawafText
+                )
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = AppFonts.KaiseiDecolFontFamily,
+                    fontSize = 10.sp,
+                    color = JawafTextSecondary
+                )
+            )
+        }
+    }
+}
+
+/**
+ * Compact Chat Bot Card with Lottie animation
+ */
+@Composable
+fun CompactChatBotCard(
+    onChatBotClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // Lottie animation for live_chatbot
+    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.live_chatbot))
+    val progress by animateLottieCompositionAsState(
+        composition,
+        iterations = LottieConstants.IterateForever
+    )
+
+    Card(
+        modifier = modifier
+            .height(160.dp)
+            .clickable { onChatBotClick() },
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = JawafAccent),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Lottie Animation
+            Box(
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                composition?.let {
+                    LottieAnimation(
+                        composition = it,
+                        progress = { progress },
+                        modifier = Modifier.size(50.dp)
+                    )
+                }
+            }
+
+            Column {
+                Text(
+                    text = "AI Companion",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontFamily = AppFonts.KarlaFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = Color.White
+                    )
+                )
+                Text(
+                    text = "Chat now →",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = AppFonts.KaiseiDecolFontFamily,
+                        fontSize = 12.sp,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Activity Card with Communication Health percentage - Clickable to navigate to Analytics
+ */
+@Composable
+fun ActivityHealthCard(
+    healthPercentage: Int,
+    onClick: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    val healthStatus = when {
+        healthPercentage >= 80 -> "Excellent"
+        healthPercentage >= 60 -> "Good"
+        healthPercentage >= 40 -> "Fair"
+        else -> "Needs Work"
+    }
+
+    val statusColor = when {
+        healthPercentage >= 80 -> Color(0xFF4CAF50)
+        healthPercentage >= 60 -> JawafAccent
+        healthPercentage >= 40 -> Color(0xFFFFB800)
+        else -> Color(0xFFFF5722)
+    }
+
+    Card(
+        modifier = modifier
+            .height(160.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF191919)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Health",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontFamily = AppFonts.KarlaFontFamily,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 12.sp,
+                        color = Color.White.copy(alpha = 0.7f)
+                    )
+                )
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(statusColor)
+                )
+            }
+
+            Column {
+                Text(
+                    text = "$healthPercentage%",
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontFamily = AppFonts.KarlaFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 36.sp,
+                        color = Color.White
+                    )
+                )
+                Text(
+                    text = healthStatus,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = AppFonts.KaiseiDecolFontFamily,
+                        fontSize = 12.sp,
+                        color = statusColor
+                    )
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Quick Stats Card for 2-column layout (kept for reference)
+ */
+@Composable
+fun QuickStatsCard(
+    messagesCount: Int,
+    conversationsCount: Int,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.height(140.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF191919)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Activity",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontFamily = AppFonts.KarlaFontFamily,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 12.sp,
+                        color = Color.White.copy(alpha = 0.7f)
+                    )
+                )
+                Icon(
+                    imageVector = Icons.Filled.TrendingUp,
+                    contentDescription = null,
+                    tint = JawafAccent,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+
+            Column {
+                Text(
+                    text = "${messagesCount + conversationsCount}",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontFamily = AppFonts.KarlaFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 28.sp,
+                        color = Color.White
+                    )
+                )
+                Text(
+                    text = "Total interactions",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = AppFonts.KaiseiDecolFontFamily,
+                        fontSize = 11.sp,
+                        color = JawafAccent
+                    )
+                )
             }
         }
     }
@@ -1367,5 +1755,103 @@ fun CompactPlatformIcon(
                 color = Color.White.copy(alpha = 0.8f)
             )
         )
+    }
+}
+
+/**
+ * Calculate reply speed based on time difference between received and sent messages
+ * Returns a score from 0-100 where higher is faster
+ * EXACT SAME as AnalyticsScreen.calculateReplySpeed()
+ */
+private fun calculateHomeReplySpeed(messages: List<NotificationMemoryStore.Message>): Int {
+    if (messages.isEmpty()) return 0
+
+    val replyTimes = mutableListOf<Long>()
+
+    // Group messages by conversation
+    val messagesByConvo = messages.groupBy { it.convo_id }
+
+    messagesByConvo.forEach { (_, convoMessages) ->
+        val sortedMessages = convoMessages.sortedBy { it.timestamp }
+
+        var lastIncomingTime: Long? = null
+
+        for (msg in sortedMessages) {
+            if (!msg.is_outgoing) {
+                // Incoming message - record timestamp
+                lastIncomingTime = msg.timestamp
+            } else if (msg.is_outgoing && lastIncomingTime != null) {
+                // Outgoing message after incoming - calculate reply time
+                val replyTime = msg.timestamp - lastIncomingTime
+                if (replyTime > 0 && replyTime < 24 * 60 * 60 * 1000) { // Within 24 hours
+                    replyTimes.add(replyTime)
+                }
+                lastIncomingTime = null // Reset after reply
+            }
+        }
+    }
+
+    if (replyTimes.isEmpty()) return 50 // Default if no reply data
+
+    val avgReplyTimeMs = replyTimes.average()
+
+    // Convert to score: Faster reply = higher score
+    return when {
+        avgReplyTimeMs < 1 * 60 * 1000 -> 100
+        avgReplyTimeMs < 5 * 60 * 1000 -> 90
+        avgReplyTimeMs < 15 * 60 * 1000 -> 80
+        avgReplyTimeMs < 30 * 60 * 1000 -> 70
+        avgReplyTimeMs < 60 * 60 * 1000 -> 60
+        avgReplyTimeMs < 2 * 60 * 60 * 1000 -> 50
+        avgReplyTimeMs < 6 * 60 * 60 * 1000 -> 40
+        avgReplyTimeMs < 12 * 60 * 60 * 1000 -> 30
+        else -> 20
+    }
+}
+
+/**
+ * Calculate consistency based on regular response patterns
+ */
+private fun calculateHomeConsistency(
+    messages: List<NotificationMemoryStore.Message>,
+    conversations: List<NotificationMemoryStore.Conversation>
+): Int {
+    if (conversations.isEmpty()) return 0
+
+    // Count conversations with at least one reply
+    val conversationsWithReplies = conversations.count { convo ->
+        messages.any { it.convo_id == convo.convo_id && it.is_outgoing }
+    }
+
+    val consistencyRate = (conversationsWithReplies.toFloat() / conversations.size) * 100
+    return consistencyRate.toInt().coerceIn(0, 100)
+}
+
+/**
+ * Calculate engagement based on message frequency and conversation count
+ */
+private fun calculateHomeEngagement(
+    messages: List<NotificationMemoryStore.Message>,
+    conversations: List<NotificationMemoryStore.Conversation>
+): Int {
+    if (conversations.isEmpty()) return 0
+
+    val past7Days = System.currentTimeMillis() - (7 * 24 * 60 * 60 * 1000)
+    val recentMessages = messages.filter { it.timestamp >= past7Days }
+
+    // Engagement based on recent activity
+    val avgMessagesPerConvo = if (conversations.isNotEmpty()) {
+        recentMessages.size.toFloat() / conversations.size
+    } else 0f
+
+    // Score based on average messages per conversation
+    return when {
+        avgMessagesPerConvo >= 20 -> 100
+        avgMessagesPerConvo >= 15 -> 90
+        avgMessagesPerConvo >= 10 -> 80
+        avgMessagesPerConvo >= 5 -> 70
+        avgMessagesPerConvo >= 3 -> 60
+        avgMessagesPerConvo >= 1 -> 50
+        else -> 30
     }
 }
