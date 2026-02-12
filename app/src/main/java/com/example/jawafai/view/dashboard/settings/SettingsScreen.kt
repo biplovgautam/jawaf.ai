@@ -43,6 +43,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import androidx.compose.runtime.livedata.observeAsState
 import kotlinx.coroutines.tasks.await
+import com.airbnb.lottie.compose.*
+import com.example.jawafai.R
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.ActivityCompat
 import android.widget.Toast
@@ -163,6 +165,9 @@ fun SettingsContent(
     // State for expandable about section
     var isAboutExpanded by remember { mutableStateOf(false) }
 
+    // State for expandable integrated platforms section
+    var isPlatformsExpanded by remember { mutableStateOf(false) }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -179,6 +184,7 @@ fun SettingsContent(
                 name = userName,
                 email = userEmail,
                 profileImageUrl = profileImage ?: "",
+                isPro = userModel?.isPro ?: false,
                 onClick = onProfileClicked
             )
         }
@@ -200,6 +206,26 @@ fun SettingsContent(
             PersonaCard(
                 onClick = onPersonaClicked,
                 completed = personaCompleted
+            )
+        }
+
+        // Integrated Platforms Section
+        item {
+            Text(
+                text = "Integrated Platforms",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontFamily = AppFonts.KarlaFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = Color(0xFF395B64)
+                )
+            )
+        }
+
+        item {
+            IntegratedPlatformsCard(
+                isExpanded = isPlatformsExpanded,
+                onClick = { isPlatformsExpanded = !isPlatformsExpanded }
             )
         }
 
@@ -253,6 +279,7 @@ fun UserProfileCard(
     name: String,
     email: String,
     profileImageUrl: String,
+    isPro: Boolean,
     onClick: () -> Unit
 ) {
     Card(
@@ -269,21 +296,65 @@ fun UserProfileCard(
                 .padding(20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Profile image
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFA5C9CA))
+            // Profile image with premium badge
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Image(
-                    painter = rememberAsyncImagePainter(
-                        model = profileImageUrl.ifEmpty { "https://ui-avatars.com/api/?name=$name&background=A5C9CA&color=ffffff" }
-                    ),
-                    contentDescription = "Profile picture",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFA5C9CA))
+                ) {
+                    Image(
+                        painter = rememberAsyncImagePainter(
+                            model = profileImageUrl.ifEmpty { "https://ui-avatars.com/api/?name=$name&background=A5C9CA&color=ffffff" }
+                        ),
+                        contentDescription = "Profile picture",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+
+                // Premium badge below profile image
+                if (isPro) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                    colors = listOf(
+                                        Color(0xFFFFD700),
+                                        Color(0xFFFFA500)
+                                    )
+                                )
+                            )
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Star,
+                                contentDescription = "Pro",
+                                tint = Color.White,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "PRO",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontFamily = AppFonts.KarlaFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    color = Color.White
+                                )
+                            )
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.width(16.dp))
@@ -327,13 +398,20 @@ fun PersonaCard(
     onClick: () -> Unit,
     completed: Boolean
 ) {
+    // Lottie animation for persona
+    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.persona))
+    val progress by animateLottieCompositionAsState(
+        composition,
+        iterations = LottieConstants.IterateForever
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (completed) Color(0xFFF0F8FF) else Color(0xFFF8F9FA)
+            containerColor = Color(0xFFF8F9FA)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
@@ -343,22 +421,34 @@ fun PersonaCard(
                 .padding(20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icon
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (completed) Color(0xFF395B64) else Color(0xFFA5C9CA)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (completed) Icons.Filled.Check else Icons.Outlined.Person,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
+            // Lottie Animation instead of static icon
+            Box {
+                composition?.let {
+                    LottieAnimation(
+                        composition = it,
+                        progress = { progress },
+                        modifier = Modifier.size(56.dp)
+                    )
+                }
+
+                // Tick mark overlay when completed
+                if (completed) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(20.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF395B64)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = "Completed",
+                            tint = Color.White,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.width(16.dp))
@@ -594,3 +684,264 @@ fun AboutCard(
         }
     }
 }
+
+@Composable
+fun IntegratedPlatformsCard(
+    isExpanded: Boolean,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Icon
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF395B64)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Link,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Connected Apps",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = AppFonts.KarlaFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = Color(0xFF395B64)
+                        )
+                    )
+                    Text(
+                        text = "Manage your connected platforms",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = AppFonts.KaiseiDecolFontFamily,
+                            fontSize = 12.sp,
+                            color = Color(0xFF666666)
+                        )
+                    )
+                }
+
+                Icon(
+                    imageVector = if (isExpanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    tint = Color(0xFF395B64),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            // Expanded content - Platform items
+            if (isExpanded) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                HorizontalDivider(
+                    color = Color(0xFFE0E0E0),
+                    thickness = 1.dp
+                )
+
+                // WhatsApp with Lottie
+                PlatformItemWithLottie(
+                    animationRes = R.raw.whatsapp,
+                    name = "WhatsApp",
+                    description = "Connect your WhatsApp"
+                )
+
+                HorizontalDivider(
+                    color = Color(0xFFE0E0E0),
+                    thickness = 1.dp,
+                    modifier = Modifier.padding(start = 56.dp)
+                )
+
+                // Instagram with Lottie
+                PlatformItemWithLottie(
+                    animationRes = R.raw.insta,
+                    name = "Instagram",
+                    description = "Connect your Instagram DMs"
+                )
+
+                HorizontalDivider(
+                    color = Color(0xFFE0E0E0),
+                    thickness = 1.dp,
+                    modifier = Modifier.padding(start = 56.dp)
+                )
+
+                // Messenger with Lottie
+                PlatformItemWithLottie(
+                    animationRes = R.raw.messenger,
+                    name = "Messenger",
+                    description = "Connect Facebook Messenger"
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun PlatformItemWithLottie(
+    animationRes: Int,
+    name: String,
+    description: String
+) {
+    // Lottie animation
+    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(animationRes))
+    val progress by animateLottieCompositionAsState(
+        composition,
+        iterations = LottieConstants.IterateForever
+    )
+
+    // Switch state
+    var isEnabled by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Lottie Animation for platform icon
+        composition?.let {
+            LottieAnimation(
+                composition = it,
+                progress = { progress },
+                modifier = Modifier.size(44.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        // Platform info
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontFamily = AppFonts.KarlaFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = Color(0xFF395B64)
+                )
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = AppFonts.KaiseiDecolFontFamily,
+                    fontSize = 12.sp,
+                    color = Color(0xFF666666)
+                )
+            )
+        }
+
+        // Switch toggle
+        Switch(
+            checked = isEnabled,
+            onCheckedChange = { isEnabled = it },
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = Color(0xFF395B64),
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = Color(0xFFE0E0E0),
+                uncheckedBorderColor = Color.Transparent
+            )
+        )
+    }
+}
+
+@Composable
+fun PlatformItem(
+    icon: ImageVector,
+    name: String,
+    description: String,
+    color: Color,
+    isConnected: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { /* Handle platform connection */ }
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Platform icon
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(color.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        // Platform info
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontFamily = AppFonts.KarlaFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = Color(0xFF395B64)
+                )
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = AppFonts.KaiseiDecolFontFamily,
+                    fontSize = 12.sp,
+                    color = Color(0xFF666666)
+                )
+            )
+        }
+
+        // Connection status
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(
+                    if (isConnected) Color(0xFF395B64) else Color(0xFFE0E0E0)
+                )
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            Text(
+                text = if (isConnected) "Connected" else "Connect",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = AppFonts.KarlaFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    color = if (isConnected) Color.White else Color(0xFF666666)
+                )
+            )
+        }
+    }
+}
+
