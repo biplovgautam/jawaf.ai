@@ -86,16 +86,40 @@ class JawafaiNotificationListenerService : NotificationListenerService() {
         return SUPPORTED_APPS.containsKey(packageName)
     }
 
+    /**
+     * Check if the app is both supported AND connected by user
+     */
+    private fun isAppConnected(packageName: String): Boolean {
+        // First check if it's a supported app
+        if (!isSupportedApp(packageName)) {
+            return false
+        }
+
+        // Then check if user has connected this app
+        return com.example.jawafai.managers.ConnectedAppsManager.shouldProcessNotification(packageName)
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val packageName = sbn.packageName ?: return
 
-        // Skip our own notifications and unsupported apps
-        if (packageName == this.packageName || !isSupportedApp(packageName)) {
+        // Skip our own notifications
+        if (packageName == this.packageName) {
+            return
+        }
+
+        // Skip if not a supported app
+        if (!isSupportedApp(packageName)) {
             Log.d(TAG, "Notification ignored - not from supported app: $packageName")
             return
         }
 
-        Log.d(TAG, "Processing notification from ${SUPPORTED_APPS[packageName]}")
+        // Skip if app is not connected by user in settings
+        if (!isAppConnected(packageName)) {
+            Log.d(TAG, "Notification ignored - app not connected in settings: $packageName")
+            return
+        }
+
+        Log.d(TAG, "Processing notification from ${SUPPORTED_APPS[packageName]} (connected)")
 
         try {
             val smartNotification = extractNotificationData(sbn)

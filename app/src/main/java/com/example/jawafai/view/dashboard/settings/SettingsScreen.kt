@@ -43,6 +43,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import androidx.compose.runtime.livedata.observeAsState
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.launch
 import com.airbnb.lottie.compose.*
 import com.example.jawafai.R
 import androidx.compose.ui.platform.LocalContext
@@ -225,7 +226,8 @@ fun SettingsContent(
         item {
             IntegratedPlatformsCard(
                 isExpanded = isPlatformsExpanded,
-                onClick = { isPlatformsExpanded = !isPlatformsExpanded }
+                onClick = { isPlatformsExpanded = !isPlatformsExpanded },
+                isPro = userModel?.isPro ?: false
             )
         }
 
@@ -688,8 +690,106 @@ fun AboutCard(
 @Composable
 fun IntegratedPlatformsCard(
     isExpanded: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    isPro: Boolean = false
 ) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    // Connected apps state from Firebase
+    var connectedApps by remember { mutableStateOf(com.example.jawafai.model.ConnectedAppsModel.empty()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var showProDialog by remember { mutableStateOf(false) }
+
+    // Load connected apps from Firebase
+    LaunchedEffect(Unit) {
+        try {
+            connectedApps = com.example.jawafai.managers.ConnectedAppsManager.getConnectedApps()
+        } catch (e: Exception) {
+            // Handle error silently
+        } finally {
+            isLoading = false
+        }
+    }
+
+    // Pro upgrade dialog
+    if (showProDialog) {
+        AlertDialog(
+            onDismissRequest = { showProDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Outlined.Star,
+                        contentDescription = null,
+                        tint = Color(0xFFFFD700),
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Upgrade to Pro",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontFamily = AppFonts.KarlaFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF395B64)
+                        )
+                    )
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "You've reached the maximum limit of 2 connected apps for free users.",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = AppFonts.KaiseiDecolFontFamily,
+                            color = Color(0xFF666666)
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Upgrade to Pro to connect unlimited apps and unlock all premium features!",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = AppFonts.KaiseiDecolFontFamily,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF395B64)
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showProDialog = false
+                        // TODO: Navigate to subscription screen
+                        Toast.makeText(context, "Pro subscription coming soon!", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFFD700)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Star,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Upgrade Now",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showProDialog = false }) {
+                    Text("Maybe Later", color = Color.Gray)
+                }
+            },
+            containerColor = Color.White,
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -736,14 +836,27 @@ fun IntegratedPlatformsCard(
                             color = Color(0xFF395B64)
                         )
                     )
-                    Text(
-                        text = "Manage your connected platforms",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = AppFonts.KaiseiDecolFontFamily,
-                            fontSize = 12.sp,
-                            color = Color(0xFF666666)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "${connectedApps.getConnectedCount()} connected",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = AppFonts.KaiseiDecolFontFamily,
+                                fontSize = 12.sp,
+                                color = Color(0xFF666666)
+                            )
                         )
-                    )
+                        if (!isPro) {
+                            Text(
+                                text = " • ${com.example.jawafai.model.ConnectedAppsModel.MAX_FREE_APPS - connectedApps.getConnectedCount()} slots left",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = AppFonts.KaiseiDecolFontFamily,
+                                    fontSize = 12.sp,
+                                    color = if (connectedApps.getConnectedCount() >= com.example.jawafai.model.ConnectedAppsModel.MAX_FREE_APPS)
+                                        Color(0xFFE57373) else Color(0xFF81C784)
+                                )
+                            )
+                        }
+                    }
                 }
 
                 Icon(
@@ -767,7 +880,33 @@ fun IntegratedPlatformsCard(
                 PlatformItemWithLottie(
                     animationRes = R.raw.whatsapp,
                     name = "WhatsApp",
-                    description = "Connect your WhatsApp"
+                    description = "Connect your WhatsApp",
+                    isEnabled = connectedApps.whatsapp,
+                    isLoading = isLoading,
+                    onToggle = { enable ->
+                        coroutineScope.launch {
+                            val result = com.example.jawafai.managers.ConnectedAppsManager.togglePlatform(
+                                platform = com.example.jawafai.model.SupportedPlatform.WHATSAPP,
+                                enable = enable,
+                                isPro = isPro
+                            )
+                            if (result.first) {
+                                connectedApps = connectedApps.copy(whatsapp = enable)
+                                Toast.makeText(
+                                    context,
+                                    if (enable) "WhatsApp connected!" else "WhatsApp disconnected",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                // Show pro dialog if limit reached
+                                if (result.second?.contains("Pro") == true) {
+                                    showProDialog = true
+                                } else {
+                                    Toast.makeText(context, result.second, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    }
                 )
 
                 HorizontalDivider(
@@ -780,7 +919,32 @@ fun IntegratedPlatformsCard(
                 PlatformItemWithLottie(
                     animationRes = R.raw.insta,
                     name = "Instagram",
-                    description = "Connect your Instagram DMs"
+                    description = "Connect your Instagram DMs",
+                    isEnabled = connectedApps.instagram,
+                    isLoading = isLoading,
+                    onToggle = { enable ->
+                        coroutineScope.launch {
+                            val result = com.example.jawafai.managers.ConnectedAppsManager.togglePlatform(
+                                platform = com.example.jawafai.model.SupportedPlatform.INSTAGRAM,
+                                enable = enable,
+                                isPro = isPro
+                            )
+                            if (result.first) {
+                                connectedApps = connectedApps.copy(instagram = enable)
+                                Toast.makeText(
+                                    context,
+                                    if (enable) "Instagram connected!" else "Instagram disconnected",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                if (result.second?.contains("Pro") == true) {
+                                    showProDialog = true
+                                } else {
+                                    Toast.makeText(context, result.second, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    }
                 )
 
                 HorizontalDivider(
@@ -793,8 +957,62 @@ fun IntegratedPlatformsCard(
                 PlatformItemWithLottie(
                     animationRes = R.raw.messenger,
                     name = "Messenger",
-                    description = "Connect Facebook Messenger"
+                    description = "Connect Facebook Messenger",
+                    isEnabled = connectedApps.messenger,
+                    isLoading = isLoading,
+                    onToggle = { enable ->
+                        coroutineScope.launch {
+                            val result = com.example.jawafai.managers.ConnectedAppsManager.togglePlatform(
+                                platform = com.example.jawafai.model.SupportedPlatform.MESSENGER,
+                                enable = enable,
+                                isPro = isPro
+                            )
+                            if (result.first) {
+                                connectedApps = connectedApps.copy(messenger = enable)
+                                Toast.makeText(
+                                    context,
+                                    if (enable) "Messenger connected!" else "Messenger disconnected",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                if (result.second?.contains("Pro") == true) {
+                                    showProDialog = true
+                                } else {
+                                    Toast.makeText(context, result.second, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    }
                 )
+
+                // Pro hint for free users
+                if (!isPro) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFFFFF8E1))
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Info,
+                            contentDescription = null,
+                            tint = Color(0xFFFFA000),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Free users can connect up to 2 apps. Upgrade to Pro for unlimited!",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = AppFonts.KaiseiDecolFontFamily,
+                                fontSize = 12.sp,
+                                color = Color(0xFF795548)
+                            )
+                        )
+                    }
+                }
             }
         }
     }
@@ -804,7 +1022,10 @@ fun IntegratedPlatformsCard(
 fun PlatformItemWithLottie(
     animationRes: Int,
     name: String,
-    description: String
+    description: String,
+    isEnabled: Boolean = false,
+    isLoading: Boolean = false,
+    onToggle: (Boolean) -> Unit = {}
 ) {
     // Lottie animation
     val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(animationRes))
@@ -812,9 +1033,6 @@ fun PlatformItemWithLottie(
         composition,
         iterations = LottieConstants.IterateForever
     )
-
-    // Switch state
-    var isEnabled by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier
@@ -854,18 +1072,26 @@ fun PlatformItemWithLottie(
             )
         }
 
-        // Switch toggle
-        Switch(
-            checked = isEnabled,
-            onCheckedChange = { isEnabled = it },
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = Color(0xFF395B64),
-                uncheckedThumbColor = Color.White,
-                uncheckedTrackColor = Color(0xFFE0E0E0),
-                uncheckedBorderColor = Color.Transparent
+        // Switch toggle with loading state
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(24.dp),
+                strokeWidth = 2.dp,
+                color = Color(0xFF395B64)
             )
-        )
+        } else {
+            Switch(
+                checked = isEnabled,
+                onCheckedChange = { onToggle(it) },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = Color(0xFF1BC994),
+                    uncheckedThumbColor = Color.White,
+                    uncheckedTrackColor = Color(0xFFE0E0E0),
+                    uncheckedBorderColor = Color.Transparent
+                )
+            )
+        }
     }
 }
 

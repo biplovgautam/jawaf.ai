@@ -8,6 +8,11 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import com.google.firebase.auth.FirebaseAuth
 import android.util.Log
 import com.example.jawafai.managers.CloudinaryManager
+import com.example.jawafai.managers.ConnectedAppsManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class JawafaiApplication : Application(), DefaultLifecycleObserver {
 
@@ -18,6 +23,7 @@ class JawafaiApplication : Application(), DefaultLifecycleObserver {
     }
 
     private var isAppInBackground = false
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
         super<Application>.onCreate()
@@ -27,6 +33,18 @@ class JawafaiApplication : Application(), DefaultLifecycleObserver {
 
         // Register lifecycle observer to monitor app state
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
+
+        // Initialize ConnectedAppsManager if user is logged in
+        FirebaseAuth.getInstance().currentUser?.let {
+            applicationScope.launch {
+                try {
+                    ConnectedAppsManager.initialize()
+                    Log.d("JawafaiApp", "ConnectedAppsManager initialized")
+                } catch (e: Exception) {
+                    Log.e("JawafaiApp", "Failed to initialize ConnectedAppsManager: ${e.message}")
+                }
+            }
+        }
 
         Log.d("JawafaiApp", "Application created")
     }
@@ -41,6 +59,17 @@ class JawafaiApplication : Application(), DefaultLifecycleObserver {
         sharedPreferences.edit()
             .putLong(PREF_LAST_ACTIVITY_TIME, System.currentTimeMillis())
             .apply()
+
+        // Refresh ConnectedAppsManager when app comes to foreground
+        FirebaseAuth.getInstance().currentUser?.let {
+            applicationScope.launch {
+                try {
+                    ConnectedAppsManager.initialize()
+                } catch (e: Exception) {
+                    Log.e("JawafaiApp", "Failed to refresh ConnectedAppsManager: ${e.message}")
+                }
+            }
+        }
 
         Log.d("JawafaiApp", "App came to foreground")
     }
