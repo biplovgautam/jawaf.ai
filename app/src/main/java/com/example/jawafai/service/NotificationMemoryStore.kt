@@ -124,6 +124,124 @@ object NotificationMemoryStore {
     }
 
     /**
+     * Parse notification sender based on platform-specific formats
+     * Returns: Triple(is_outgoing, sender_name_for_bubble, display_name_for_conversation)
+     *
+     * Platform formats:
+     * - WhatsApp: title = "SenderName" or "You" (outgoing)
+     * - Instagram: title = "username: SenderName", selfDisplayName = "YourName"
+     * - Messenger: title = "SenderName" or "You" (outgoing)
+     */
+    private fun parseNotificationSender(
+        packageName: String,
+        title: String,
+        sender: String?,
+        extras: Map<String, String>
+    ): Triple<Boolean, String, String> {
+
+        return when {
+            // Instagram specific parsing
+            packageName.contains("instagram", ignoreCase = true) -> {
+                parseInstagramSender(title, extras)
+            }
+
+            // WhatsApp specific parsing
+            packageName.contains("whatsapp", ignoreCase = true) -> {
+                parseWhatsAppSender(title, sender)
+            }
+
+            // Messenger specific parsing
+            packageName.contains("messenger", ignoreCase = true) ||
+            packageName.contains("facebook.orca", ignoreCase = true) -> {
+                parseMessengerSender(title, sender)
+            }
+
+            // Default fallback
+            else -> {
+                val is_outgoing = title.equals("You", ignoreCase = true)
+                val sender_name = if (is_outgoing) "You" else (sender ?: title)
+                Triple(is_outgoing, sender_name, sender_name)
+            }
+        }
+    }
+
+    /**
+     * Parse Instagram notification sender
+     * Format: title = "username: SenderName"
+     * selfDisplayName = phone owner's name
+     *
+     * Example:
+     * - title = "xyzeep.jpeg: Roshan Jaishi" (incoming from Roshan)
+     * - title = "xyzeep.jpeg: Pawan" (outgoing, because selfDisplayName = "Pawan")
+     */
+    private fun parseInstagramSender(title: String, extras: Map<String, String>): Triple<Boolean, String, String> {
+        // Get selfDisplayName (phone owner's name)
+        val selfDisplayName = extras["android.selfDisplayName"] ?: ""
+
+        // Title format: "username: SenderName"
+        val colonIndex = title.lastIndexOf(":")
+
+        if (colonIndex != -1 && colonIndex < title.length - 1) {
+            // Extract sender name after the colon
+            val senderInTitle = title.substring(colonIndex + 1).trim()
+
+            // Check if sender name matches selfDisplayName (outgoing)
+            val is_outgoing = senderInTitle.equals(selfDisplayName, ignoreCase = true)
+
+            if (is_outgoing) {
+                // Outgoing message
+                // sender_name = "You" for bubble display
+                // display_name = extract from title (the part before colon is the username we're chatting with)
+                // But for Instagram, we need the OTHER person's name, which we get from previous incoming messages
+                return Triple(true, "You", "")
+            } else {
+                // Incoming message from senderInTitle
+                // sender_name = actual sender name
+                // display_name = same (for showing in inbox)
+                return Triple(false, senderInTitle, senderInTitle)
+            }
+        }
+
+        // Fallback: check if title matches selfDisplayName directly
+        if (title.equals(selfDisplayName, ignoreCase = true)) {
+            return Triple(true, "You", "")
+        }
+
+        // Default: treat as incoming
+        return Triple(false, title, title)
+    }
+
+    /**
+     * Parse WhatsApp notification sender
+     * Format: title = "SenderName" or "You"
+     */
+    private fun parseWhatsAppSender(title: String, sender: String?): Triple<Boolean, String, String> {
+        val is_outgoing = title.equals("You", ignoreCase = true)
+
+        return if (is_outgoing) {
+            Triple(true, "You", "")
+        } else {
+            val sender_name = sender ?: title
+            Triple(false, sender_name, sender_name)
+        }
+    }
+
+    /**
+     * Parse Messenger notification sender
+     * Similar to WhatsApp
+     */
+    private fun parseMessengerSender(title: String, sender: String?): Triple<Boolean, String, String> {
+        val is_outgoing = title.equals("You", ignoreCase = true)
+
+        return if (is_outgoing) {
+            Triple(true, "You", "")
+        } else {
+            val sender_name = sender ?: title
+            Triple(false, sender_name, sender_name)
+        }
+    }
+
+    /**
      * Add notification to conversation-based storage (Table 1 & 2)
      */
     private fun addToConversationStore(notification: ExternalNotification) {
@@ -132,29 +250,21 @@ object NotificationMemoryStore {
         val msg_content = notification.text
         val timestamp = notification.time
 
-        // Determine if this is an outgoing message
-        // In WhatsApp: title = "You" means YOU sent the message (outgoing)
+        // Get title and extras for platform-specific parsing
         val title = notification.title
-        val sender = notification.sender
-        val is_outgoing = title.equals("You", ignoreCase = true)
+        val extras = notification.rawExtras
 
-        // Determine sender name and display name
-        val sender_name: String
-        val should_update_display_name: Boolean
+        // Determine if this is an outgoing message and extract proper sender name
+        val (is_outgoing, sender_name, display_name_for_convo) = parseNotificationSender(
+            packageName = package_name,
+            title = title,
+            sender = notification.sender,
+            extras = extras
+        )
 
-        if (is_outgoing) {
-            // Outgoing message (You sent it)
-            // sender_name = "You" (for message bubble)
-            // DON'T update conversation display_name (keep showing the recipient's name)
-            sender_name = "You"
-            should_update_display_name = false
-        } else {
-            // Incoming message (Someone sent it to you)
-            // sender_name = actual sender
-            // DO update conversation display_name to show who sent it
-            sender_name = sender ?: title
-            should_update_display_name = true
-        }
+        // Should we update the conversation's display name?
+        // Only update if it's an incoming message (we want to show the OTHER person's name)
+        val should_update_display_name = !is_outgoing
 
         // Update or create conversation (Table 1)
         val existingConvoIndex = conversations.indexOfFirst { it.convo_id == convo_id }
@@ -167,16 +277,15 @@ object NotificationMemoryStore {
                 last_msg_content = msg_content,
                 unread_count = if (is_outgoing) existingConvo.unread_count else existingConvo.unread_count + 1,
                 // Only update display_name if it's NOT an outgoing message
-                display_name = if (should_update_display_name) sender_name else existingConvo.display_name
+                display_name = if (should_update_display_name && display_name_for_convo.isNotBlank())
+                    display_name_for_convo else existingConvo.display_name
             ))
         } else {
             // Create new conversation
-            // For first message, use sender_name as display_name
-            // (If it's "You", we'll update it when we receive the first incoming message)
             conversations.add(0, Conversation(
                 convo_id = convo_id,
                 package_name = package_name,
-                display_name = if (should_update_display_name) sender_name else "Unknown", // Will be updated on first incoming message
+                display_name = if (display_name_for_convo.isNotBlank()) display_name_for_convo else "Unknown",
                 last_msg_time = timestamp,
                 last_msg_content = msg_content,
                 platform_id = null,
