@@ -31,12 +31,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.jawafai.managers.GroqApiManager
+import com.example.jawafai.managers.ReminderFirebaseManager
+import com.example.jawafai.model.DetectedReminderIntent
+import com.example.jawafai.model.Reminder
+import com.example.jawafai.model.ReminderSource
 import com.example.jawafai.service.NotificationAIReplyManager
 import com.example.jawafai.service.NotificationMemoryStore
+import com.example.jawafai.service.ReminderIntentDetector
 import com.example.jawafai.service.RemoteReplyService
 import com.example.jawafai.ui.theme.AppFonts
 import com.example.jawafai.view.ui.theme.JawafAccent
 import com.example.jawafai.view.ui.theme.JawafText
+import com.example.jawafai.view.components.ReminderConfirmationDialog
 import com.example.jawafai.managers.NotificationFirebaseManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -101,6 +107,32 @@ fun ConversationDetailScreen(
     var editableReplyText by remember { mutableStateOf("") }
     var isSending by remember { mutableStateOf(false) }
     var showAIReplyDialog by remember { mutableStateOf(false) }
+
+    // Reminder intent detection states
+    var detectedReminderIntent by remember { mutableStateOf<DetectedReminderIntent?>(null) }
+    var showReminderDialog by remember { mutableStateOf(false) }
+
+    // Function to check for reminder intent in messages
+    fun checkForReminderIntent(message: NotificationMemoryStore.Message) {
+        if (message.is_outgoing) return // Don't check outgoing messages
+
+        coroutineScope.launch {
+            // Get recent messages for context
+            val recentMessages = messages.takeLast(5).map { it.msg_content }
+
+            val intent = ReminderIntentDetector.detectReminderIntent(
+                message = message.msg_content,
+                conversationContext = recentMessages,
+                source = ReminderSource.CHAT_NOTIFICATION,
+                conversationId = conversationId
+            )
+
+            if (intent != null && intent.detectedDateTime != null) {
+                detectedReminderIntent = intent
+                showReminderDialog = true
+            }
+        }
+    }
 
     // Auto-scroll to bottom when new messages arrive
     LaunchedEffect(messages.size) {
@@ -666,6 +698,40 @@ fun ConversationDetailScreen(
             },
             containerColor = Color.White,
             shape = RoundedCornerShape(16.dp)
+        )
+    }
+
+    // Reminder Confirmation Dialog
+    if (showReminderDialog && detectedReminderIntent != null) {
+        ReminderConfirmationDialog(
+            detectedIntent = detectedReminderIntent!!,
+            onConfirm = { reminder ->
+                coroutineScope.launch {
+                    val userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+                    val reminderWithUser = reminder.copy(userId = userId)
+
+                    val result = ReminderFirebaseManager.saveReminder(reminderWithUser)
+                    result.onSuccess {
+                        Toast.makeText(
+                            context,
+                            "Reminder saved! 🎯 ${reminder.title}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }.onFailure { error ->
+                        Toast.makeText(
+                            context,
+                            "Failed to save reminder: ${error.message}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+                showReminderDialog = false
+                detectedReminderIntent = null
+            },
+            onDismiss = {
+                showReminderDialog = false
+                detectedReminderIntent = null
+            }
         )
     }
 }

@@ -1,5 +1,6 @@
 package com.example.jawafai.view.dashboard.reminder
 
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -22,14 +23,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.jawafai.managers.ReminderFirebaseManager
+import com.example.jawafai.model.Reminder
+import com.example.jawafai.model.EventType as ModelEventType
 import com.example.jawafai.ui.theme.AppFonts
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.*
@@ -46,63 +53,52 @@ private val JawafBackground = Color(0xFFFAFAFA)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReminderScreen() {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     var currentMonth by remember { mutableStateOf(YearMonth.now()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var reminders by remember { mutableStateOf<List<Reminder>>(emptyList()) }
 
-    // Sample events data (will be replaced with actual data later)
-    val sampleEvents = remember {
-        listOf(
+    // Load reminders from Firebase
+    LaunchedEffect(Unit) {
+        isLoading = true
+        val result = ReminderFirebaseManager.getAllReminders()
+        result.onSuccess { fetchedReminders ->
+            reminders = fetchedReminders
+        }.onFailure { error ->
+            Toast.makeText(context, "Failed to load reminders: ${error.message}", Toast.LENGTH_SHORT).show()
+        }
+        isLoading = false
+    }
+
+    // Convert Reminder to ReminderEvent for UI
+    val reminderEvents = remember(reminders) {
+        reminders.map { reminder ->
             ReminderEvent(
-                id = "1",
-                title = "Team Meeting",
-                description = "Weekly sync with the team",
-                date = LocalDate.now(),
-                time = "10:00 AM",
-                type = EventType.MEETING,
-                color = Color(0xFF4285F4)
-            ),
-            ReminderEvent(
-                id = "2",
-                title = "Doctor Appointment",
-                description = "Annual checkup",
-                date = LocalDate.now(),
-                time = "2:30 PM",
-                type = EventType.HEALTH,
-                color = Color(0xFFEA4335)
-            ),
-            ReminderEvent(
-                id = "3",
-                title = "Project Deadline",
-                description = "Submit final report",
-                date = LocalDate.now().plusDays(1),
-                time = "5:00 PM",
-                type = EventType.WORK,
-                color = Color(0xFFFBBC04)
-            ),
-            ReminderEvent(
-                id = "4",
-                title = "Birthday Party",
-                description = "John's birthday celebration",
-                date = LocalDate.now().plusDays(2),
-                time = "7:00 PM",
-                type = EventType.PERSONAL,
-                color = Color(0xFF34A853)
-            ),
-            ReminderEvent(
-                id = "5",
-                title = "Gym Session",
-                description = "Cardio and strength training",
-                date = LocalDate.now().plusDays(3),
-                time = "6:00 AM",
-                type = EventType.HEALTH,
-                color = Color(0xFFEA4335)
+                id = reminder.id,
+                title = reminder.title,
+                description = reminder.description,
+                date = reminder.getLocalDate(),
+                time = reminder.getFormattedTime(),
+                type = try {
+                    EventType.valueOf(reminder.eventType)
+                } catch (e: Exception) {
+                    EventType.OTHER
+                },
+                color = try {
+                    Color(android.graphics.Color.parseColor(reminder.color))
+                } catch (e: Exception) {
+                    JawafAccent
+                }
             )
-        )
+        }
     }
 
     // Filter events for selected date and upcoming
-    val eventsForSelectedDate = sampleEvents.filter { it.date == selectedDate }
-    val upcomingEvents = sampleEvents.filter { it.date >= LocalDate.now() }.sortedBy { it.date }
+    val eventsForSelectedDate = reminderEvents.filter { it.date == selectedDate }
+    val upcomingEvents = reminderEvents.filter { it.date >= LocalDate.now() }.sortedBy { it.date }
 
     Scaffold(
         containerColor = JawafBackground,
@@ -197,7 +193,7 @@ fun ReminderScreen() {
                     selectedDate = selectedDate,
                     onDateSelected = { selectedDate = it },
                     onMonthChanged = { currentMonth = it },
-                    eventsMap = sampleEvents.groupBy { it.date }
+                    eventsMap = reminderEvents.groupBy { it.date }
                 )
             }
 

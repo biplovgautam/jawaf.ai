@@ -529,10 +529,79 @@ object GroqApiManager {
     }
 
     /**
-     * Checks if API key is configured
+     * Generic method to send chat request with custom messages
+     * Used by ReminderIntentDetector and other services
      */
-    fun isApiKeyConfigured(): Boolean {
-        return GROQ_API_KEY != "gsk_your_groq_api_key_here" && validateApiKey(GROQ_API_KEY)
+    suspend fun sendChatRequest(
+        messages: List<ChatMessage>,
+        temperature: Float = TEMPERATURE,
+        maxTokens: Int = MAX_TOKENS
+    ): GroqResponse = withContext(Dispatchers.IO) {
+        try {
+            if (GROQ_API_KEY.isBlank() || GROQ_API_KEY == "null") {
+                return@withContext GroqResponse(
+                    success = false,
+                    message = null,
+                    error = "API key not configured"
+                )
+            }
+
+            val messagesArray = JSONArray()
+            messages.forEach { message ->
+                val messageObj = JSONObject().apply {
+                    put("role", message.role)
+                    put("content", message.content)
+                }
+                messagesArray.put(messageObj)
+            }
+
+            val requestBody = JSONObject().apply {
+                put("model", DEFAULT_MODEL)
+                put("messages", messagesArray)
+                put("max_tokens", maxTokens)
+                put("temperature", temperature)
+            }
+
+            val request = Request.Builder()
+                .url(GROQ_BASE_URL)
+                .post(requestBody.toString().toRequestBody("application/json".toMediaType()))
+                .addHeader("Authorization", "Bearer $GROQ_API_KEY")
+                .addHeader("Content-Type", "application/json")
+                .build()
+
+            val response = httpClient.newCall(request).execute()
+            val responseBody = response.body?.string()
+
+            if (response.isSuccessful && responseBody != null) {
+                val jsonResponse = JSONObject(responseBody)
+                val choices = jsonResponse.getJSONArray("choices")
+
+                if (choices.length() > 0) {
+                    val botResponse = choices.getJSONObject(0)
+                        .getJSONObject("message")
+                        .getString("content")
+
+                    return@withContext GroqResponse(
+                        success = true,
+                        message = botResponse.trim(),
+                        error = null
+                    )
+                }
+            }
+
+            return@withContext GroqResponse(
+                success = false,
+                message = null,
+                error = "API request failed: ${response.code}"
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "sendChatRequest error: ${e.message}", e)
+            return@withContext GroqResponse(
+                success = false,
+                message = null,
+                error = e.message ?: "Unknown error"
+            )
+        }
     }
 
     /**

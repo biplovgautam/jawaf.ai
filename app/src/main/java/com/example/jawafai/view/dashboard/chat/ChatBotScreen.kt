@@ -1,6 +1,7 @@
 package com.example.jawafai.view.dashboard.chat
 
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -33,8 +34,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.airbnb.lottie.compose.*
 import com.example.jawafai.R
+import com.example.jawafai.managers.ReminderFirebaseManager
 import com.example.jawafai.model.ChatBotMessageModel
+import com.example.jawafai.model.DetectedReminderIntent
+import com.example.jawafai.model.Reminder
+import com.example.jawafai.model.ReminderSource
+import com.example.jawafai.service.ReminderIntentDetector
 import com.example.jawafai.ui.theme.AppFonts
+import com.example.jawafai.view.components.ReminderConfirmationDialog
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
@@ -129,6 +136,10 @@ fun ChatBotScreen(
     var messageText by remember { mutableStateOf("") }
     var showNewChatDialog by remember { mutableStateOf(false) }
 
+    // Reminder intent detection states
+    var detectedReminderIntent by remember { mutableStateOf<DetectedReminderIntent?>(null) }
+    var showReminderDialog by remember { mutableStateOf(false) }
+
     val keyboardController = LocalSoftwareKeyboardController.current
     val listState = rememberLazyListState()
 
@@ -221,6 +232,25 @@ fun ChatBotScreen(
                 // Add AI message (limit to 20 messages total)
                 messages = (messages + aiMessage).takeLast(20)
                 isTyping = false
+
+                // Check for reminder intent in the conversation
+                try {
+                    if (ReminderIntentDetector.shouldCheckForReminder(message)) {
+                        val conversationContext = messages.takeLast(5).map { it.message }
+                        val intent: DetectedReminderIntent? = ReminderIntentDetector.detectReminderIntent(
+                            message = message,
+                            conversationContext = conversationContext,
+                            source = ReminderSource.CHATBOT,
+                            conversationId = "chatbot_session"
+                        )
+                        if (intent != null && intent.detectedDateTime != null) {
+                            detectedReminderIntent = intent
+                            showReminderDialog = true
+                        }
+                    }
+                } catch (reminderError: Exception) {
+                    Log.e("ChatBotScreen", "Reminder detection error: ${reminderError.message}")
+                }
             } catch (e: Exception) {
                 Log.e("ChatBotScreen", "Exception in sendMessage: ${e.message}", e)
                 val errorMessage = ChatBotMessageModel(
@@ -318,6 +348,40 @@ fun ChatBotScreen(
             },
             containerColor = Color.White,
             shape = RoundedCornerShape(20.dp)
+        )
+    }
+
+    // Reminder Confirmation Dialog
+    if (showReminderDialog && detectedReminderIntent != null) {
+        ReminderConfirmationDialog(
+            detectedIntent = detectedReminderIntent!!,
+            onConfirm = { reminder ->
+                coroutineScope.launch {
+                    val userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+                    val reminderWithUser = reminder.copy(userId = userId)
+
+                    val result = ReminderFirebaseManager.saveReminder(reminderWithUser)
+                    result.onSuccess {
+                        Toast.makeText(
+                            context,
+                            "Reminder saved! 🎯 ${reminder.title}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }.onFailure { error ->
+                        Toast.makeText(
+                            context,
+                            "Failed to save reminder: ${error.message}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+                showReminderDialog = false
+                detectedReminderIntent = null
+            },
+            onDismiss = {
+                showReminderDialog = false
+                detectedReminderIntent = null
+            }
         )
     }
 
