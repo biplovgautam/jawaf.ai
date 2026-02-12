@@ -51,6 +51,7 @@ import androidx.core.app.ActivityCompat
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import com.example.jawafai.managers.NotificationHealthManager
 
 data class SettingsItemData(
     val icon: ImageVector,
@@ -229,6 +230,23 @@ fun SettingsContent(
                 onClick = { isPlatformsExpanded = !isPlatformsExpanded },
                 isPro = userModel?.isPro ?: false
             )
+        }
+
+        // Notification Health Section
+        item {
+            Text(
+                text = "Notification Status",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontFamily = AppFonts.KarlaFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = Color(0xFF395B64)
+                )
+            )
+        }
+
+        item {
+            NotificationHealthCard()
         }
 
         // About Section
@@ -1171,3 +1189,233 @@ fun PlatformItem(
     }
 }
 
+/**
+ * Notification Health Status Card
+ * Shows the current status of notification listening service
+ */
+@Composable
+fun NotificationHealthCard() {
+    val context = LocalContext.current
+
+    // Check health status
+    val healthStatus = remember {
+        mutableStateOf(NotificationHealthManager.checkHealth(context))
+    }
+    val timeSinceLastNotification = remember {
+        mutableStateOf(NotificationHealthManager.getTimeSinceLastNotification())
+    }
+    val todayCount = remember {
+        mutableStateOf(NotificationHealthManager.getTodayNotificationCount())
+    }
+
+    // Refresh status periodically
+    LaunchedEffect(Unit) {
+        while (true) {
+            healthStatus.value = NotificationHealthManager.checkHealth(context)
+            timeSinceLastNotification.value = NotificationHealthManager.getTimeSinceLastNotification()
+            todayCount.value = NotificationHealthManager.getTodayNotificationCount()
+            kotlinx.coroutines.delay(30000) // Refresh every 30 seconds
+        }
+    }
+
+    val (statusColor, statusText, statusIcon) = when (healthStatus.value) {
+        NotificationHealthManager.HealthStatus.HEALTHY -> Triple(
+            Color(0xFF4CAF50), // Green
+            "Active & Listening",
+            Icons.Outlined.CheckCircle
+        )
+        NotificationHealthManager.HealthStatus.WARNING -> Triple(
+            Color(0xFFFF9800), // Orange
+            "No messages in 30+ min",
+            Icons.Outlined.Warning
+        )
+        NotificationHealthManager.HealthStatus.CRITICAL -> Triple(
+            Color(0xFFF44336), // Red
+            "No messages in 1+ hour",
+            Icons.Outlined.Error
+        )
+        NotificationHealthManager.HealthStatus.NO_ACCESS -> Triple(
+            Color(0xFFF44336), // Red
+            "Access Disabled",
+            Icons.Outlined.NotificationsOff
+        )
+        NotificationHealthManager.HealthStatus.NO_DATA -> Triple(
+            Color(0xFF2196F3), // Blue
+            "Waiting for first message",
+            Icons.Outlined.HourglassEmpty
+        )
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Status icon with colored background
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(statusColor.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = statusIcon,
+                        contentDescription = null,
+                        tint = statusColor,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Notification Listener",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = AppFonts.KarlaFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = Color(0xFF395B64)
+                        )
+                    )
+                    Text(
+                        text = statusText,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = AppFonts.KaiseiDecolFontFamily,
+                            fontSize = 12.sp,
+                            color = statusColor
+                        )
+                    )
+                }
+
+                // Status badge
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(statusColor)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Stats row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                // Today's count
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "${todayCount.value}",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontFamily = AppFonts.KarlaFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 24.sp,
+                            color = Color(0xFF395B64)
+                        )
+                    )
+                    Text(
+                        text = "Today",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = AppFonts.KaiseiDecolFontFamily,
+                            fontSize = 12.sp,
+                            color = Color(0xFF888888)
+                        )
+                    )
+                }
+
+                // Divider
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(40.dp)
+                        .background(Color(0xFFE0E0E0))
+                )
+
+                // Last notification time
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    val timeText = when {
+                        timeSinceLastNotification.value < 0 -> "—"
+                        timeSinceLastNotification.value < 60000 -> "Just now"
+                        timeSinceLastNotification.value < 3600000 -> "${timeSinceLastNotification.value / 60000}m ago"
+                        timeSinceLastNotification.value < 86400000 -> "${timeSinceLastNotification.value / 3600000}h ago"
+                        else -> "${timeSinceLastNotification.value / 86400000}d ago"
+                    }
+                    Text(
+                        text = timeText,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontFamily = AppFonts.KarlaFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp,
+                            color = Color(0xFF395B64)
+                        )
+                    )
+                    Text(
+                        text = "Last Message",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = AppFonts.KaiseiDecolFontFamily,
+                            fontSize = 12.sp,
+                            color = Color(0xFF888888)
+                        )
+                    )
+                }
+            }
+
+            // Enable access button if needed
+            if (healthStatus.value == NotificationHealthManager.HealthStatus.NO_ACCESS) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = {
+                        val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF395B64)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Settings,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Enable Notification Access",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = AppFonts.KarlaFontFamily,
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                }
+            }
+
+            // Info text
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "💡 Jawaf.AI runs in the background 24/7 to capture messages even when the app is closed.",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = AppFonts.KaiseiDecolFontFamily,
+                    fontSize = 11.sp,
+                    color = Color(0xFF888888)
+                )
+            )
+        }
+    }
+}

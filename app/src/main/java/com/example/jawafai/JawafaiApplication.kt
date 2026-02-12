@@ -10,6 +10,7 @@ import android.util.Log
 import com.example.jawafai.managers.CloudinaryManager
 import com.example.jawafai.managers.ConnectedAppsManager
 import com.example.jawafai.managers.NotificationFirebaseManager
+import com.example.jawafai.managers.NotificationHealthManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,6 +32,9 @@ class JawafaiApplication : Application(), DefaultLifecycleObserver {
 
         // Initialize CloudinaryManager
         CloudinaryManager.init(this)
+
+        // Initialize NotificationHealthManager for monitoring
+        NotificationHealthManager.initialize(this)
 
         // Register lifecycle observer to monitor app state
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)

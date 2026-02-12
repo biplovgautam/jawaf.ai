@@ -130,6 +130,9 @@ class JawafaiNotificationListenerService : NotificationListenerService() {
             if (isNewNotification) {
                 Log.d(TAG, "New notification stored: ${smartNotification.conversationId}")
 
+                // Record notification received for health monitoring
+                com.example.jawafai.managers.NotificationHealthManager.recordNotificationReceived(this)
+
                 // Broadcast to AI module if reply action is available
                 if (smartNotification.hasReplyAction) {
                     triggerAIReplyGeneration(smartNotification)
