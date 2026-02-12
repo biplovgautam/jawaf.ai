@@ -4,7 +4,9 @@ import android.content.Context
 import android.util.Log
 import com.example.jawafai.managers.GroqApiManager
 import com.example.jawafai.managers.ReminderFirebaseManager
+import com.example.jawafai.model.DetectedReminderIntent
 import com.example.jawafai.model.Reminder
+import com.example.jawafai.model.ReminderSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -440,7 +442,8 @@ object NotificationAIReplyManager {
         val success: Boolean,
         val reply: String?,
         val error: String?,
-        val conversationId: String
+        val conversationId: String,
+        val detectedReminderIntent: DetectedReminderIntent? = null // Reminder intent if detected
     )
 
     data class ConversationStats(
@@ -586,8 +589,9 @@ object NotificationAIReplyManager {
     }
 
     /**
-     * Generate schedule-aware AI reply
-     * This method checks the user's calendar and incorporates availability into the response
+     * Generate schedule-aware AI reply with reminder intent detection
+     * This method checks the user's calendar, incorporates availability into the response,
+     * and also detects any reminder-worthy events in the conversation
      */
     suspend fun generateScheduleAwareReply(
         notification: NotificationMemoryStore.ExternalNotification,
@@ -656,11 +660,39 @@ object NotificationAIReplyManager {
                 // Update message with AI reply
                 NotificationMemoryStore.updateAIReply(notification.hash, groqResponse.message)
 
+                // ===== REMINDER INTENT DETECTION =====
+                // Check if the conversation contains reminder-worthy events
+                var detectedIntent: DetectedReminderIntent? = null
+                try {
+                    Log.d(TAG, "🔍 Checking for reminder intent in conversation...")
+
+                    // Build conversation context for intent detection
+                    val conversationContext = conversationMessages.takeLast(5).map { it.msg_content }
+
+                    // Detect reminder intent
+                    detectedIntent = ReminderIntentDetector.detectReminderIntent(
+                        message = messageText,
+                        conversationContext = conversationContext,
+                        source = ReminderSource.CHAT_NOTIFICATION,
+                        conversationId = conversationId
+                    )
+
+                    if (detectedIntent != null) {
+                        Log.d(TAG, "🎯 Reminder intent detected: ${detectedIntent.title} at ${detectedIntent.detectedDateTime}")
+                    } else {
+                        Log.d(TAG, "📭 No reminder intent detected")
+                    }
+                } catch (reminderError: Exception) {
+                    Log.e(TAG, "⚠️ Reminder detection error (non-fatal): ${reminderError.message}")
+                    // Continue without reminder - this is non-fatal
+                }
+
                 return@withContext AIReplyResult(
                     success = true,
                     reply = groqResponse.message,
                     error = null,
-                    conversationId = conversationId
+                    conversationId = conversationId,
+                    detectedReminderIntent = detectedIntent
                 )
             } else {
                 return@withContext AIReplyResult(
@@ -716,7 +748,7 @@ object NotificationAIReplyManager {
     }
 
     /**
-     * Generate schedule-aware reply from a Message object
+     * Generate schedule-aware reply from a Message object with reminder intent detection
      */
     suspend fun generateScheduleAwareReplyFromMessage(
         message: NotificationMemoryStore.Message,
@@ -774,11 +806,39 @@ object NotificationAIReplyManager {
                 // Update message with AI reply
                 NotificationMemoryStore.updateMessageAIReply(message.msg_hash, groqResponse.message)
 
+                // ===== REMINDER INTENT DETECTION =====
+                // Check if the conversation contains reminder-worthy events
+                var detectedIntent: DetectedReminderIntent? = null
+                try {
+                    Log.d(TAG, "🔍 Checking for reminder intent in message conversation...")
+
+                    // Build conversation context for intent detection
+                    val conversationContext = conversationMessages.takeLast(5).map { it.msg_content }
+
+                    // Detect reminder intent
+                    detectedIntent = ReminderIntentDetector.detectReminderIntent(
+                        message = messageText,
+                        conversationContext = conversationContext,
+                        source = ReminderSource.CHAT_NOTIFICATION,
+                        conversationId = conversationId
+                    )
+
+                    if (detectedIntent != null) {
+                        Log.d(TAG, "🎯 Reminder intent detected: ${detectedIntent.title} at ${detectedIntent.detectedDateTime}")
+                    } else {
+                        Log.d(TAG, "📭 No reminder intent detected")
+                    }
+                } catch (reminderError: Exception) {
+                    Log.e(TAG, "⚠️ Reminder detection error (non-fatal): ${reminderError.message}")
+                    // Continue without reminder - this is non-fatal
+                }
+
                 return@withContext AIReplyResult(
                     success = true,
                     reply = groqResponse.message,
                     error = null,
-                    conversationId = conversationId
+                    conversationId = conversationId,
+                    detectedReminderIntent = detectedIntent
                 )
             } else {
                 return@withContext AIReplyResult(

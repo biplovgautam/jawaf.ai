@@ -199,7 +199,7 @@ fun ConversationDetailScreen(
         }
     }
 
-    // Generate AI Reply function with conversation context, user persona, and schedule awareness
+    // Generate AI Reply function with conversation context, user persona, schedule awareness, and reminder detection
     fun generateAIReply(message: NotificationMemoryStore.Message) {
         coroutineScope.launch {
             try {
@@ -242,6 +242,14 @@ fun ConversationDetailScreen(
                         selectedMessageForReply = message
                         showAIReplyDialog = true
                         Toast.makeText(context, "AI reply generated! ✨", Toast.LENGTH_SHORT).show()
+
+                        // Check if reminder intent was detected
+                        if (result.detectedReminderIntent != null) {
+                            detectedReminderIntent = result.detectedReminderIntent
+                            // Show reminder dialog after a short delay (let user see AI reply first)
+                            kotlinx.coroutines.delay(500)
+                            showReminderDialog = true
+                        }
                     } else {
                         Toast.makeText(context, "Failed: ${result.error}", Toast.LENGTH_LONG).show()
                     }
@@ -265,6 +273,14 @@ fun ConversationDetailScreen(
                         selectedMessageForReply = message
                         showAIReplyDialog = true
                         Toast.makeText(context, "AI reply generated! ✨", Toast.LENGTH_SHORT).show()
+
+                        // Check if reminder intent was detected
+                        if (result.detectedReminderIntent != null) {
+                            detectedReminderIntent = result.detectedReminderIntent
+                            // Show reminder dialog after a short delay (let user see AI reply first)
+                            kotlinx.coroutines.delay(500)
+                            showReminderDialog = true
+                        }
                     } else {
                         Toast.makeText(context, "Failed: ${result.error}", Toast.LENGTH_LONG).show()
                     }
