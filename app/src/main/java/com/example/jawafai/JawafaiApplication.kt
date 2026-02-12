@@ -33,8 +33,11 @@ class JawafaiApplication : Application(), DefaultLifecycleObserver {
         // Initialize CloudinaryManager
         CloudinaryManager.init(this)
 
-        // Initialize NotificationHealthManager for monitoring
+        // Initialize NotificationHealthManager for monitoring (includes foreground service start)
         NotificationHealthManager.initialize(this)
+
+        // Log permission state for debugging
+        com.example.jawafai.utils.NotificationPermissionUtils.logPermissionState(this)
 
         // Register lifecycle observer to monitor app state
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
@@ -59,15 +62,28 @@ class JawafaiApplication : Application(), DefaultLifecycleObserver {
                     Log.e("JawafaiApp", "Failed to load notifications from Firebase: ${e.message}")
                 }
             }
+
+            // Start foreground service for 24/7 notification listening
+            applicationScope.launch {
+                try {
+                    NotificationHealthManager.tryStartForegroundService(this@JawafaiApplication)
+                    Log.d("JawafaiApp", "Foreground service start requested")
+                } catch (e: Exception) {
+                    Log.e("JawafaiApp", "Failed to start foreground service: ${e.message}")
+                }
+            }
         }
 
-        Log.d("JawafaiApp", "Application created")
+        Log.d("JawafaiApp", "Application created with 24/7 background support")
     }
 
     override fun onStart(owner: LifecycleOwner) {
         super<DefaultLifecycleObserver>.onStart(owner)
         // App came to foreground
         isAppInBackground = false
+
+        // Ensure foreground service is running when app comes to foreground
+        NotificationHealthManager.tryStartForegroundService(this)
 
         // Update last activity time
         val sharedPreferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

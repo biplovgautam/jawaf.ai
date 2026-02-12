@@ -1244,6 +1244,11 @@ fun NotificationHealthCard() {
             "Waiting for first message",
             Icons.Outlined.HourglassEmpty
         )
+        NotificationHealthManager.HealthStatus.SERVICE_DISCONNECTED -> Triple(
+            Color(0xFFF44336), // Red
+            "Service Disconnected",
+            Icons.Outlined.SyncDisabled
+        )
     }
 
     Card(

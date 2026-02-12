@@ -17,6 +17,10 @@ import android.app.RemoteInput
 import android.app.Notification
 import android.app.PendingIntent
 import android.os.Bundle
+import android.os.IBinder
+import android.content.pm.ServiceInfo
+import com.example.jawafai.R
+import com.example.jawafai.view.dashboard.DashboardActivity
 import kotlin.random.Random
 
 class JawafaiNotificationListenerService : NotificationListenerService() {
@@ -27,6 +31,15 @@ class JawafaiNotificationListenerService : NotificationListenerService() {
         const val AI_REPLY_BROADCAST_ACTION = "com.example.jawafai.AI_REPLY_REQUEST"
         const val REPLY_GENERATED_ACTION = "com.example.jawafai.REPLY_GENERATED"
         const val REPLY_SENT_ACTION = "com.example.jawafai.REPLY_SENT"
+
+        // Foreground service constants
+        private const val FOREGROUND_SERVICE_ID = 1001
+        private const val FOREGROUND_CHANNEL_ID = "jawafai_foreground_service"
+        private const val FOREGROUND_CHANNEL_NAME = "Jawaf.AI Background Service"
+
+        // Action to start as foreground
+        const val ACTION_START_FOREGROUND = "com.example.jawafai.START_FOREGROUND_SERVICE"
+        const val ACTION_STOP_FOREGROUND = "com.example.jawafai.STOP_FOREGROUND_SERVICE"
 
         // Define the package names of apps we want to capture notifications from
         private val SUPPORTED_APPS = mapOf(
@@ -48,9 +61,35 @@ class JawafaiNotificationListenerService : NotificationListenerService() {
             ) ?: return false
             return enabledListeners.contains(context.packageName)
         }
+
+        /**
+         * Start the service as a foreground service
+         */
+        fun startForegroundService(context: Context) {
+            val intent = Intent(context, JawafaiNotificationListenerService::class.java).apply {
+                action = ACTION_START_FOREGROUND
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+            Log.d(TAG, "Requested foreground service start")
+        }
+
+        /**
+         * Stop the foreground service (but keep listener active)
+         */
+        fun stopForegroundService(context: Context) {
+            val intent = Intent(context, JawafaiNotificationListenerService::class.java).apply {
+                action = ACTION_STOP_FOREGROUND
+            }
+            context.startService(intent)
+        }
     }
 
     private val localBroadcastManager by lazy { LocalBroadcastManager.getInstance(this) }
+    private var isRunningInForeground = false
 
     // Broadcast receiver for handling AI-generated replies
     private val replyReceiver = object : BroadcastReceiver() {
@@ -61,13 +100,59 @@ class JawafaiNotificationListenerService : NotificationListenerService() {
         }
     }
 
+    override fun onCreate() {
+        super.onCreate()
+        Log.d(TAG, "Service onCreate")
+        createForegroundNotificationChannel()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d(TAG, "onStartCommand received: action=${intent?.action}")
+
+        when (intent?.action) {
+            ACTION_START_FOREGROUND -> {
+                startForegroundWithNotification()
+            }
+            ACTION_STOP_FOREGROUND -> {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                isRunningInForeground = false
+                Log.d(TAG, "Stopped foreground mode")
+            }
+            else -> {
+                // Default: start in foreground mode for persistence
+                if (!isRunningInForeground) {
+                    startForegroundWithNotification()
+                }
+            }
+        }
+
+        // START_STICKY ensures the service is restarted if killed
+        return START_STICKY
+    }
+
+    override fun onBind(intent: Intent?): IBinder? {
+        // Start foreground when bound to ensure persistence
+        if (!isRunningInForeground) {
+            startForegroundWithNotification()
+        }
+        return super.onBind(intent)
+    }
+
     override fun onListenerConnected() {
         super.onListenerConnected()
         Log.d(TAG, "Smart Messaging Assistant connected!")
 
+        // Ensure we're running in foreground for persistence
+        if (!isRunningInForeground) {
+            startForegroundWithNotification()
+        }
+
         // Register broadcast receiver for AI replies
         val filter = IntentFilter(REPLY_GENERATED_ACTION)
         localBroadcastManager.registerReceiver(replyReceiver, filter)
+
+        // Notify health manager that service is connected
+        com.example.jawafai.managers.NotificationHealthManager.recordServiceConnected(this)
     }
 
     override fun onListenerDisconnected() {
@@ -80,6 +165,107 @@ class JawafaiNotificationListenerService : NotificationListenerService() {
         } catch (e: Exception) {
             Log.e(TAG, "Error unregistering receiver: ${e.message}")
         }
+
+        // Notify health manager that service disconnected
+        com.example.jawafai.managers.NotificationHealthManager.recordServiceDisconnected(this)
+
+        // Request rebind to reconnect
+        requestRebind(android.content.ComponentName(this, JawafaiNotificationListenerService::class.java))
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        Log.d(TAG, "Service onDestroy - will be restarted due to START_STICKY")
+    }
+
+    /**
+     * Create the notification channel for foreground service
+     */
+    private fun createForegroundNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                FOREGROUND_CHANNEL_ID,
+                FOREGROUND_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_LOW // Low importance = no sound, minimal visibility
+            ).apply {
+                description = "Keeps Jawaf.AI running to capture your messages"
+                setShowBadge(false)
+                lockscreenVisibility = Notification.VISIBILITY_SECRET
+            }
+
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+            Log.d(TAG, "Created foreground notification channel")
+        }
+    }
+
+    /**
+     * Start running as a foreground service with persistent notification
+     */
+    private fun startForegroundWithNotification() {
+        try {
+            val notification = buildForegroundNotification()
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                // Android 14+ requires specific foreground service type
+                startForeground(
+                    FOREGROUND_SERVICE_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                // Android 10-13: Use data sync type as fallback
+                startForeground(
+                    FOREGROUND_SERVICE_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                )
+            } else {
+                // Android 9 and below
+                startForeground(FOREGROUND_SERVICE_ID, notification)
+            }
+
+            isRunningInForeground = true
+            Log.d(TAG, "✅ Started foreground service with persistent notification")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to start foreground: ${e.message}")
+            // Fallback: try without service type
+            try {
+                val notification = buildForegroundNotification()
+                @Suppress("DEPRECATION")
+                startForeground(FOREGROUND_SERVICE_ID, notification)
+                isRunningInForeground = true
+                Log.d(TAG, "✅ Started foreground service (fallback)")
+            } catch (e2: Exception) {
+                Log.e(TAG, "❌ Fallback also failed: ${e2.message}")
+            }
+        }
+    }
+
+    /**
+     * Build the persistent foreground notification
+     */
+    private fun buildForegroundNotification(): Notification {
+        // Intent to open the app when notification is tapped
+        val openAppIntent = Intent(this, DashboardActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, openAppIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        return NotificationCompat.Builder(this, FOREGROUND_CHANNEL_ID)
+            .setContentTitle("Jawaf.AI Active")
+            .setContentText("Listening for messages in background")
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setOngoing(true)
+            .setSilent(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setContentIntent(pendingIntent)
+            .setShowWhen(false)
+            .build()
     }
 
     private fun isSupportedApp(packageName: String): Boolean {
