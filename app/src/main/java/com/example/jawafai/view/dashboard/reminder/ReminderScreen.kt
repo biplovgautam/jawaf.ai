@@ -96,9 +96,10 @@ fun ReminderScreen() {
         }
     }
 
-    // Filter events for selected date and upcoming
+    // Filter events for selected date and upcoming (excluding today's events from upcoming)
+    val todayEvents = reminderEvents.filter { it.date == LocalDate.now() }
     val eventsForSelectedDate = reminderEvents.filter { it.date == selectedDate }
-    val upcomingEvents = reminderEvents.filter { it.date >= LocalDate.now() }.sortedBy { it.date }
+    val upcomingEvents = reminderEvents.filter { it.date > LocalDate.now() }.sortedBy { it.date }
 
     Scaffold(
         containerColor = JawafBackground,
@@ -114,38 +115,16 @@ fun ReminderScreen() {
                         .statusBarsPadding()
                         .padding(horizontal = 20.dp, vertical = 16.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Reminders",
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontFamily = AppFonts.KarlaFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 28.sp,
-                                color = JawafText
-                            )
+                    Text(
+                        text = "Reminders",
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontFamily = AppFonts.KarlaFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 28.sp,
+                            color = JawafText
                         )
+                    )
 
-                        // Add reminder button
-                        FloatingActionButton(
-                            onClick = { /* TODO: Add reminder */ },
-                            modifier = Modifier.size(40.dp),
-                            containerColor = JawafAccent,
-                            contentColor = Color.White,
-                            elevation = FloatingActionButtonDefaults.elevation(
-                                defaultElevation = 2.dp
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Add Reminder",
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
 
                     Spacer(modifier = Modifier.height(4.dp))
 
@@ -197,74 +176,112 @@ fun ReminderScreen() {
                 )
             }
 
-            // Selected Date Events
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = if (selectedDate == LocalDate.now()) "Today's Events"
-                           else selectedDate.format(DateTimeFormatter.ofPattern("EEEE, MMM d")),
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontFamily = AppFonts.KarlaFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = JawafText
-                    ),
-                    modifier = Modifier.padding(horizontal = 20.dp)
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            if (eventsForSelectedDate.isEmpty()) {
+            // Today's Events Section - Only show if there are events today
+            if (todayEvents.isNotEmpty()) {
                 item {
-                    EmptyEventsCard(
-                        message = "No events for this day",
-                        icon = Icons.Outlined.EventBusy
-                    )
-                }
-            } else {
-                items(eventsForSelectedDate) { event ->
-                    EventCard(event = event)
-                }
-            }
+                    Spacer(modifier = Modifier.height(16.dp))
 
-            // Upcoming Events Section
-            item {
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
                     Text(
-                        text = "Upcoming Events",
+                        text = "Today's Events",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontFamily = AppFonts.KarlaFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
                             color = JawafText
-                        )
+                        ),
+                        modifier = Modifier.padding(horizontal = 20.dp)
                     )
 
-                    Text(
-                        text = "${upcomingEvents.size} events",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = AppFonts.KaiseiDecolFontFamily,
-                            fontSize = 12.sp,
-                            color = JawafAccent
-                        )
-                    )
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                items(todayEvents) { event ->
+                    EventCard(event = event)
+                }
             }
 
-            items(upcomingEvents) { event ->
-                EventCard(event = event, showDate = true)
+            // Selected Date Events - Only show if selected date is NOT today
+            if (selectedDate != LocalDate.now()) {
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = selectedDate.format(DateTimeFormatter.ofPattern("EEEE, MMM d")),
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontFamily = AppFonts.KarlaFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = JawafText
+                        ),
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                if (eventsForSelectedDate.isEmpty()) {
+                    item {
+                        EmptyEventsCard(
+                            message = "No events for this day",
+                            icon = Icons.Outlined.EventBusy
+                        )
+                    }
+                } else {
+                    items(eventsForSelectedDate) { event ->
+                        EventCard(event = event)
+                    }
+                }
+            }
+
+            // Upcoming Events Section - Excludes today's events
+            if (upcomingEvents.isNotEmpty()) {
+                item {
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Upcoming Events",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontFamily = AppFonts.KarlaFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp,
+                                color = JawafText
+                            )
+                        )
+
+                        Text(
+                            text = "${upcomingEvents.size} events",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = AppFonts.KaiseiDecolFontFamily,
+                                fontSize = 12.sp,
+                                color = JawafAccent
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                items(upcomingEvents) { event ->
+                    EventCard(event = event, showDate = true)
+                }
+            }
+
+            // Empty state if no events at all
+            if (todayEvents.isEmpty() && upcomingEvents.isEmpty() && selectedDate == LocalDate.now()) {
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    EmptyEventsCard(
+                        message = "No upcoming events",
+                        icon = Icons.Outlined.EventAvailable
+                    )
+                }
             }
 
             // Bottom spacing

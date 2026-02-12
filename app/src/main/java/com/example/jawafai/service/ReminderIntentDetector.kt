@@ -2,9 +2,12 @@ package com.example.jawafai.service
 
 import android.util.Log
 import com.example.jawafai.managers.GroqApiManager
+import com.example.jawafai.managers.ReminderFirebaseManager
 import com.example.jawafai.model.DetectedReminderIntent
 import com.example.jawafai.model.EventType
+import com.example.jawafai.model.Reminder
 import com.example.jawafai.model.ReminderSource
+import com.example.jawafai.model.TimeConflictInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -41,6 +44,7 @@ object ReminderIntentDetector {
 
     /**
      * Analyze a conversation/message for reminder intent
+     * Also checks for time slot conflicts with existing reminders
      */
     suspend fun detectReminderIntent(
         message: String,
@@ -74,23 +78,102 @@ object ReminderIntentDetector {
         Log.d(TAG, "✅ Potential reminder detected, extracting details...")
 
         // Try LLM extraction
-        val extractedIntent = extractReminderWithLLM(fullContext, source, conversationId)
+        var extractedIntent = extractReminderWithLLM(fullContext, source, conversationId)
 
         if (extractedIntent != null && extractedIntent.detectedDateTime != null) {
             Log.d(TAG, "✅ Reminder intent extracted: ${extractedIntent.title}")
+            // Check for time slot conflicts
+            extractedIntent = checkTimeSlotConflicts(extractedIntent)
             return@withContext extractedIntent
         }
 
         // Fallback to rule-based extraction
-        val ruleBasedIntent = extractReminderRuleBased(fullContext, source, conversationId)
+        var ruleBasedIntent = extractReminderRuleBased(fullContext, source, conversationId)
 
         if (ruleBasedIntent != null) {
             Log.d(TAG, "✅ Rule-based extraction: ${ruleBasedIntent.title}")
+            // Check for time slot conflicts
+            ruleBasedIntent = checkTimeSlotConflicts(ruleBasedIntent)
             return@withContext ruleBasedIntent
         }
 
         Log.d(TAG, "❌ Could not extract valid reminder intent")
         return@withContext null
+    }
+
+    /**
+     * Check if the detected time slot conflicts with existing reminders
+     * Updates the DetectedReminderIntent with conflict information
+     */
+    private suspend fun checkTimeSlotConflicts(intent: DetectedReminderIntent): DetectedReminderIntent {
+        if (intent.detectedDateTime == null) return intent
+
+        try {
+            val targetDate = intent.detectedDateTime.toLocalDate()
+            Log.d(TAG, "🔍 Checking time slot conflicts for ${intent.detectedDateTime}")
+
+            // Get all reminders for the target date
+            val result = ReminderFirebaseManager.getRemindersForDate(targetDate)
+
+            result.onSuccess { existingReminders ->
+                if (existingReminders.isEmpty()) {
+                    Log.d(TAG, "✅ No existing reminders on this date - time slot is free")
+                    return intent.copy(
+                        hasTimeConflict = false,
+                        conflictingReminders = emptyList()
+                    )
+                }
+
+                // Check for overlapping time slots (within 1 hour window)
+                val targetTime = intent.detectedDateTime.toLocalTime()
+                val targetTimestamp = intent.detectedDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+                val conflictingReminders = existingReminders.filter { reminder ->
+                    val reminderTime = LocalDateTime.ofInstant(
+                        java.time.Instant.ofEpochMilli(reminder.eventDate),
+                        ZoneId.systemDefault()
+                    ).toLocalTime()
+
+                    // Check if times are within 1 hour of each other
+                    val timeDiffMinutes = kotlin.math.abs(
+                        java.time.Duration.between(targetTime, reminderTime).toMinutes()
+                    )
+
+                    timeDiffMinutes < 60 // Conflict if within 1 hour
+                }
+
+                if (conflictingReminders.isNotEmpty()) {
+                    Log.d(TAG, "⚠️ Found ${conflictingReminders.size} conflicting reminder(s)")
+                    val conflictInfo = conflictingReminders.map { reminder ->
+                        TimeConflictInfo(
+                            reminderId = reminder.id,
+                            title = reminder.title,
+                            eventTime = reminder.eventDate,
+                            formattedTime = reminder.getFormattedTime()
+                        )
+                    }
+                    return intent.copy(
+                        hasTimeConflict = true,
+                        conflictingReminders = conflictInfo
+                    )
+                } else {
+                    Log.d(TAG, "✅ No time conflicts found")
+                    return intent.copy(
+                        hasTimeConflict = false,
+                        conflictingReminders = emptyList()
+                    )
+                }
+            }
+
+            result.onFailure { error ->
+                Log.e(TAG, "❌ Failed to check conflicts: ${error.message}")
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error checking time conflicts: ${e.message}", e)
+        }
+
+        return intent
     }
 
     /**

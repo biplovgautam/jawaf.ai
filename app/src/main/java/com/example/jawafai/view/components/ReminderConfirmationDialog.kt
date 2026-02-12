@@ -121,6 +121,48 @@ fun ReminderConfirmationDialog(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
+                // Time conflict warning
+                if (detectedIntent.hasTimeConflict && detectedIntent.conflictingReminders.isNotEmpty()) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFFFF3E0) // Light orange warning background
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Warning,
+                                contentDescription = null,
+                                tint = Color(0xFFFF9800), // Orange warning color
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Time Slot Conflict",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontFamily = AppFonts.KarlaFontFamily,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = Color(0xFFE65100)
+                                    )
+                                )
+                                Text(
+                                    text = detectedIntent.getConflictMessage(),
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontFamily = AppFonts.KaiseiDecolFontFamily,
+                                        fontSize = 12.sp,
+                                        color = Color(0xFFBF360C)
+                                    )
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
                 // Source message preview
                 if (detectedIntent.sourceMessage.isNotBlank()) {
                     Surface(

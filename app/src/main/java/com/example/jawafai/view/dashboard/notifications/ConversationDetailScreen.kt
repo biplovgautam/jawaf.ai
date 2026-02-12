@@ -199,7 +199,7 @@ fun ConversationDetailScreen(
         }
     }
 
-    // Generate AI Reply function with conversation context and user persona
+    // Generate AI Reply function with conversation context, user persona, and schedule awareness
     fun generateAIReply(message: NotificationMemoryStore.Message) {
         coroutineScope.launch {
             try {
@@ -228,8 +228,8 @@ fun ConversationDetailScreen(
                     // Load user persona from Firebase for personalized responses
                     val userPersona = loadUserPersonaFromFirebase()
 
-                    // Generate AI reply with persona context
-                    val result = NotificationAIReplyManager.generateAIReplyWithContext(
+                    // Use schedule-aware reply generation for availability questions
+                    val result = NotificationAIReplyManager.generateScheduleAwareReply(
                         notification = notification,
                         conversationId = conversationId,
                         maxContextMessages = 15, // Last 15 messages for better context
@@ -249,7 +249,8 @@ fun ConversationDetailScreen(
                     // Fallback: Create notification from message if not found in store
                     val userPersona = loadUserPersonaFromFirebase()
 
-                    val result = NotificationAIReplyManager.generateAIReplyFromMessage(
+                    // Use schedule-aware reply generation from message
+                    val result = NotificationAIReplyManager.generateScheduleAwareReplyFromMessage(
                         message = message,
                         conversationId = conversationId,
                         displayName = conversation?.display_name ?: "Unknown",

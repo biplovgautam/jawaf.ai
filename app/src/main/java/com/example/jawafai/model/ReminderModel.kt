@@ -98,6 +98,7 @@ data class Reminder(
 
 /**
  * Detected reminder intent - temporary model before user confirmation
+ * Includes time conflict information for user awareness
  */
 data class DetectedReminderIntent(
     val title: String = "",
@@ -108,7 +109,9 @@ data class DetectedReminderIntent(
     val sourceMessage: String = "", // Original message that triggered detection
     val source: ReminderSource = ReminderSource.CHAT_NOTIFICATION,
     val sourceConversationId: String = "",
-    val rawDateTimeText: String = "" // The actual text that was parsed (e.g., "tomorrow at 11am")
+    val rawDateTimeText: String = "", // The actual text that was parsed (e.g., "tomorrow at 11am")
+    val hasTimeConflict: Boolean = false, // Whether this time slot has conflicts
+    val conflictingReminders: List<TimeConflictInfo> = emptyList() // List of conflicting reminders
 ) {
     fun toReminder(userId: String): Reminder {
         val eventTimestamp = detectedDateTime?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
@@ -135,7 +138,27 @@ data class DetectedReminderIntent(
         return detectedDateTime?.format(DateTimeFormatter.ofPattern("EEE, MMM d 'at' h:mm a"))
             ?: "Time not detected"
     }
+
+    fun getConflictMessage(): String {
+        if (!hasTimeConflict || conflictingReminders.isEmpty()) return ""
+
+        return if (conflictingReminders.size == 1) {
+            "⚠️ Conflicts with: ${conflictingReminders[0].title} at ${conflictingReminders[0].formattedTime}"
+        } else {
+            "⚠️ Conflicts with ${conflictingReminders.size} events around this time"
+        }
+    }
 }
+
+/**
+ * Time conflict information for existing reminders
+ */
+data class TimeConflictInfo(
+    val reminderId: String = "",
+    val title: String = "",
+    val eventTime: Long = 0L,
+    val formattedTime: String = ""
+)
 
 /**
  * Event types for categorization
